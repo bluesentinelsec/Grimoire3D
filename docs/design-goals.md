@@ -252,4 +252,4 @@ When in doubt, prefer:
 - Full CI coverage on Windows + macOS + Linux
 - Follow known successful patterns in video game engines
 
-**Immediate next steps (suggested):** Propose top-level directory and package layout, create initial skeleton with `g2d` namespace, renderer spike (OpenGL 3.30 core + basic batched sprite + shader loading), VFS spike, physics library evaluation, and a minimal "hello world" game loop that exercises configuration and hot-reload paths. All spikes should be checked against this charter.
+**Immediate next steps (suggested):** Propose top-level directory and package layout (see AGENTS.md for the mandated structure), create initial skeleton with `g2d` namespace under `src/grimoire2d/`, renderer spike (OpenGL 3.30 core + basic batched sprite + shader loading), VFS spike, physics library evaluation, and a minimal "hello world" game loop that exercises configuration and hot-reload paths. **All work must obey AGENTS.md** (architecturally correct code only — no quick fixes, hacks, or half-measures). All spikes and code must be checked against both this charter and AGENTS.md.
