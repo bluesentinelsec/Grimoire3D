@@ -154,6 +154,7 @@ The core library (`pip install grimoire2d`) delivers the framework. The source r
 - Resolution independence is achieved via integer scaling + letterboxing (the supported model).
 - Input latency is minimized for game feel; buffered/real-time input is preferred over pure event handling where it matters.
 - "The game is just data": normal content lives in the VFS (assets, JSON configs, level data, etc.). User code is the thin logic + rules layer.
+- Common data models are provided exclusively as registered extensions inside EngineConfig (which itself has no hard-coded members — only version + extensions dict). Game-specific models follow the same DataModel contract and are composed by the game (see models/config.py docstring and proposal 0001). Every addition is purely net-new.
 - Hot reload works for Python code, shaders, textures, and data (development time).
 - Performance/memory: opt-in mechanisms for constrained targets (explicitly: games should run well on original Steam Deck specs).
 - Only one primary, obvious way to accomplish common tasks (window configuration, scene transitions, asset loading, etc.).

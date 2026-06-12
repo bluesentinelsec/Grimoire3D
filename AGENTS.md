@@ -63,6 +63,11 @@ If you ever feel the need to call `gl*` or `moderngl` directly from outside pres
 - Configuration is explicit and runtime-mutable. Systems that care register interest or poll the current config snapshot.
 - Namespaces: `from grimoire2d.presentation import Camera` or `import grimoire2d.presentation as pres`. Avoid dumping everything into the top `grimoire2d` namespace except the absolute minimum (run, App, version, etc.).
 - Prefer composition and protocols (PEP 544) over deep inheritance for extension points.
+- For data models specifically: EngineConfig contains *literally nothing* except `version` and an `extensions: dict[str, DataModel]`. All configuration (common or game-specific) is delivered exclusively through registered extensions.
+  - Goal: PRs should be *exclusively* net-new code (maximum OCP).
+  - Adding anything = create new *Setting model + one register_extension() call (never touches EngineConfig.py again).
+  - Games compose via their own models (e.g. MyGameConfig(engine=..., custom=...)).
+  - See models/config.py docstring for the exact process.
 
 ### SOLID + Testability
 - Every class/module has a single, clear responsibility.

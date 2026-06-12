@@ -146,7 +146,13 @@ This structure directly supports the mandated three-way separation while allowin
 
 To handle the reality that "you do not always know your data model early":
 
-1. **Composition and Aggregation over Inheritance**: A WorldState is primarily an aggregator of other models rather than a giant class that subclasses or grows methods. New gameplay systems bring their own small data models and register them with the world.
+1. **Composition and Aggregation over Inheritance (strongly preferred, to maximize net-new PRs)**: 
+   - EngineConfig contains *literally no hard-coded members* — only `version` + `extensions: dict[str, DataModel]`.
+   - All configuration (common or game-specific) is delivered exclusively through registered extensions via `register_extension()`.
+   - Adding anything is 100% net-new code (new model + registration call). EngineConfig.py itself is never modified again.
+   - Games define their own pure models following the DataModel contract and compose (e.g. `MyGameState(engine=EngineConfig.default(), player=MyPlayerState(...))`).
+   - See models/config.py (EngineConfig docstring) for the exact "how to extend" process.
+   The engine never provides a monolithic WorldState that games subclass.
 2. **Extensible / Open Data**: Models can carry extension points (typed maps of additional named data, or a generic "user data" bag for game-specific extensions) so that user code and future engine features can attach data without modifying the core model definitions.
 3. **Mandatory Versioning + Migration Registry**: Adding a field is a non-breaking change if a migration supplies a default. Removing/renaming is handled by migration code that runs on load. This is the primary defense against unknown future changes.
 4. **Model Registry / Discovery**: A central (but extensible) place that maps type identifiers (or versioned names) to deserializers. User-defined models (for custom games or tools) can be registered.
