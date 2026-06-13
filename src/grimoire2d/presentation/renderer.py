@@ -105,17 +105,18 @@ class Renderer:
         self._quad_vbo = self.ctx.buffer(quad_data.tobytes())
         self._quad_vao = self.ctx.simple_vertex_array(self.program, self._quad_vbo, "in_pos")
 
-        # Textured quad for text (and future 2D sprites). Includes texcoords with y-flip
-        # so pygame-rendered text surfaces map correctly into GL.
+        # Textured quad for text (and future 2D sprites).
+        # Texcoords are set so that for our y-down virtual system (y=0 at top),
+        # tex v=0 corresponds to the top of the image after upload.
         textured_quad_data = array.array(
             "f",
             [
-                0.0, 0.0, 0.0, 1.0,  # pos + tex (y flipped)
-                1.0, 0.0, 1.0, 1.0,
-                1.0, 1.0, 1.0, 0.0,
-                0.0, 0.0, 0.0, 1.0,
-                1.0, 1.0, 1.0, 0.0,
-                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0,  # pos (0,0 top-left of unit) -> tex (0,0 top of image)
+                1.0, 0.0, 1.0, 0.0,
+                1.0, 1.0, 1.0, 1.0,
+                0.0, 0.0, 0.0, 0.0,
+                1.0, 1.0, 1.0, 1.0,
+                0.0, 1.0, 0.0, 1.0,
             ],
         )
         self._textured_quad_vbo = self.ctx.buffer(textured_quad_data.tobytes())
@@ -334,10 +335,13 @@ class Renderer:
         if tw <= 0 or th <= 0:
             return
 
-        # Upload as GL texture (RGBA). For a primitive this is acceptable.
-        # Future: texture atlas, caching by (text, font_size), or SDF fonts.
-        tex_data = surf.get_buffer().raw
-        texture = self.ctx.texture((tw, th), 4, tex_data)
+        # Upload as GL texture (RGBA).
+        # Use tostring with flip=True so that when we use standard texcoords
+        # (v=0 at "top" of our y-down quad), the visual top of the pygame image
+        # appears at the top of the drawn quad. This corrects the GL texture
+        # origin (bottom-left) vs pygame surface origin (top-left).
+        data = pygame.image.tostring(surf, 'RGBA', True)
+        texture = self.ctx.texture((tw, th), 4, data)
         texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
         texture.use(0)
 
