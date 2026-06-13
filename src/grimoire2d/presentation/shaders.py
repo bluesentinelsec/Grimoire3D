@@ -70,7 +70,10 @@ uniform vec2 u_scale;
 void main() {
     vec2 p = in_pos * u_scale + u_offset;
     gl_Position = u_projection * vec4(p, 0.0, 1.0);
-    v_texcoord = in_texcoord;
+    // Flip v so that the pygame-rendered text (top-left origin) appears
+    // upright in our y-down virtual coordinate system. This compensates
+    // for GL texture origin (v=0 at bottom) vs the data we upload.
+    v_texcoord = vec2(in_texcoord.x, 1.0 - in_texcoord.y);
 }
 """
 

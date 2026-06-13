@@ -336,11 +336,10 @@ class Renderer:
             return
 
         # Upload as GL texture (RGBA).
-        # Use tostring with flip=True so that when we use standard texcoords
-        # (v=0 at "top" of our y-down quad), the visual top of the pygame image
-        # appears at the top of the drawn quad. This corrects the GL texture
-        # origin (bottom-left) vs pygame surface origin (top-left).
-        data = pygame.image.tostring(surf, 'RGBA', True)
+        # We use flip=False here and handle the vertical correction explicitly
+        # in the vertex shader (1.0 - v_texcoord.y). This makes the orientation
+        # robust and independent of the exact upload convention.
+        data = pygame.image.tostring(surf, 'RGBA', False)
         texture = self.ctx.texture((tw, th), 4, data)
         texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
         texture.use(0)
