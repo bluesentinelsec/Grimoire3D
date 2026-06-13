@@ -265,9 +265,10 @@ class Renderer:
         )
 
         # Text primitive demo (proves runtime string, color, alpha, scale + logical coords)
+        # Positioned to the right of the top-left blue test rect so it doesn't overlap.
         self.draw_text(
             f"Virtual: {self._virt.width}x{self._virt.height}  (press 1-4 to change)",
-            40,
+            240,
             20,
             color=(1.0, 1.0, 0.2, 1.0),
             scale=1.0,
@@ -275,7 +276,7 @@ class Renderer:
         )
         self.draw_text(
             "Text is a primitive. Full logical surface scales + letterboxes correctly.",
-            40,
+            240,
             55,
             color=(0.7, 0.9, 1.0, 0.9),  # slight transparency
             scale=0.75,
