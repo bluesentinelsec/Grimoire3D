@@ -106,8 +106,6 @@ class Renderer:
         self._quad_vao = self.ctx.simple_vertex_array(self.program, self._quad_vbo, "in_pos")
 
         # Textured quad for text (and future 2D sprites).
-        # Texcoords are set so that for our y-down virtual system (y=0 at top),
-        # tex v=0 corresponds to the top of the image after upload.
         textured_quad_data = array.array(
             "f",
             [
@@ -336,9 +334,6 @@ class Renderer:
         if tw <= 0 or th <= 0:
             return
 
-        # Upload as GL texture (RGBA).
-        # We use flip=False here and handle the vertical correction explicitly
-        # in the vertex shader (1.0 - v_texcoord.y). This toggles only the v axis.
         data = pygame.image.tostring(surf, 'RGBA', False)
         texture = self.ctx.texture((tw, th), 4, data)
         texture.filter = (moderngl.LINEAR, moderngl.LINEAR)

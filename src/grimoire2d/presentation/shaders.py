@@ -55,7 +55,6 @@ def get_default_fragment_shader() -> str:
 
 # Textured quad shader for text (and future sprites/UI).
 # Uses per-draw offset/scale in virtual space + tint color (for runtime color/alpha).
-# Texcoords are set up with y-flip to match pygame surface -> GL texture.
 TEXTURED_VERTEX_SHADER = """#version 330 core
 
 in vec2 in_pos;
@@ -70,10 +69,7 @@ uniform vec2 u_scale;
 void main() {
     vec2 p = in_pos * u_scale + u_offset;
     gl_Position = u_projection * vec4(p, 0.0, 1.0);
-    // Toggle only the v axis (vertical). This is the standard correction
-    // for pygame surface (top-left origin) vs GL texture (bottom-left)
-    // when using y-down virtual coordinates like ours.
-    v_texcoord = vec2(in_texcoord.x, 1.0 - in_texcoord.y);
+    v_texcoord = in_texcoord;
 }
 """
 
