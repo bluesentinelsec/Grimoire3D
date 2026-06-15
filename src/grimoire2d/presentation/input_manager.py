@@ -87,7 +87,7 @@ _MAX_PADS = 4
 def _poll_keys() -> frozenset[str]:
     """Return the set of currently-pressed key names from pygame."""
     pressed = pygame.key.get_pressed()
-    return frozenset(pygame.key.name(i) for i, held in enumerate(pressed) if held)
+    return frozenset(pygame.key.name(i) for i in range(len(pressed)) if pressed[i])
 
 
 def _poll_gamepad(
