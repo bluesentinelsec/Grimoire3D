@@ -1,10 +1,7 @@
 name: CI
 
 on:
-  push:
-    branches: [main, "feat/**"]
   pull_request:
-    branches: [main]
 
 jobs:
   test:
@@ -30,7 +27,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends libgl1 libgles2
+          sudo apt-get install -y --no-install-recommends libsdl2-dev
 
       - name: Install package and test dependencies
         run: pip install -e . pytest
