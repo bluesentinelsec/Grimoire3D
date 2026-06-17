@@ -9,7 +9,8 @@ All asset loads in the engine **must** go through an instance of VFS.
 
 Supported sources:
 - Real directories (dev + hot reload)
-- Zip archives, optionally obfuscated with a simple reversible cipher (prod)
+- Zip archives, optionally obfuscated with a simple password-based cipher (prod)
+  Use :mod:`grimoire2d.assets.archive` to create such archives.
 - In-memory byte arrays (embedded resources, tests, runtime data)
 
 Typical usage::
@@ -78,6 +79,21 @@ class Provider(Protocol):
 # --------------------------------------------------------------------------- #
 
 
+def _derive_key(password: str | None) -> bytes | None:
+    """Derive an obfuscation key from a password.
+
+    This is a simple, non-cryptographic derivation. The result is used
+    with _apply_cipher for casual protection only (to discourage casual
+    tampering or inspection of game data).
+    """
+    if not password:
+        return None
+    pw = password.encode("utf-8")
+    # Repeat the password bytes to produce a reasonably long key.
+    # XOR will cycle through it anyway.
+    return (pw * 32)[:256]
+
+
 def _apply_cipher(data: bytes, key: bytes | None) -> bytes:
     """Apply a simple reversible XOR cipher.
 
@@ -143,16 +159,24 @@ class ZipProvider:
     """Provider backed by a zip archive.
 
     The archive may be provided as a filesystem path or as raw bytes.
-    An optional `key` enables a simple obfuscation layer (see _apply_cipher).
 
-    The entire archive is loaded into memory on construction. This is
-    acceptable for typical 2D game asset bundles.
+    Obfuscation:
+      - Pass `password` (recommended) for simple symmetric obfuscation.
+      - Or pass a raw `key` (advanced use).
+      - The same password/key used to create the archive must be used here.
+
+    See `_derive_key` and `_apply_cipher` for the (non-cryptographic)
+    obfuscation details. This is only intended to discourage casual
+    inspection or modification of a game's data files.
+
+    The entire archive is loaded into memory on construction.
     """
 
     def __init__(
         self,
         source: str | PathLike[str] | bytes,
         *,
+        password: str | None = None,
         key: bytes | None = None,
     ) -> None:
         if isinstance(source, (str, Path, PathLike)):
@@ -161,6 +185,9 @@ class ZipProvider:
             raw = bytes(source)
         else:
             raise TypeError("ZipProvider source must be path or bytes")
+
+        if password is not None:
+            key = _derive_key(password)
 
         archive_bytes = _apply_cipher(raw, key)
 
@@ -311,28 +338,30 @@ class VirtualFileSystem:
             norm_prefix = norm_prefix + "/"
         self._mounts.append((norm_prefix, provider))
 
-    def _resolve(self, path: str) -> tuple[Provider, str]:
-        """Return (provider, internal_path) for the first matching mount.
+    def _find_provider(self, path: str) -> tuple[Provider, str]:
+        """Find a provider that can serve the path (prefix match + file exists).
 
-        Raises AssetNotFound if nothing matches.
+        Tries mounts in reverse order (last mounted highest priority) so that
+        overlays can provide a subset of files and fall back to earlier mounts.
+        Raises AssetNotFound if no provider serves it.
         """
         norm = _normalize_path(path)
-        # Try in reverse order so last mount wins
         for prefix, provider in reversed(self._mounts):
             if prefix == "":
-                return provider, norm
-            remainder = _strip_prefix(norm, prefix.rstrip("/"))
-            if remainder is not None:
-                return provider, remainder
+                internal = norm
+            else:
+                remainder = _strip_prefix(norm, prefix.rstrip("/"))
+                if remainder is None:
+                    continue
+                internal = remainder
+            if provider.exists(internal):
+                return provider, internal
         raise AssetNotFound(path)
 
     def read_bytes(self, path: str) -> bytes:
         """Read the entire contents of a file as bytes."""
-        provider, internal = self._resolve(path)
-        try:
-            return provider.read_bytes(internal)
-        except FileNotFoundError:
-            raise AssetNotFound(path) from None
+        provider, internal = self._find_provider(path)
+        return provider.read_bytes(internal)
 
     def open(self, path: str) -> BinaryIO:
         """Open a file for binary reading.
@@ -342,17 +371,14 @@ class VirtualFileSystem:
             with vfs.open("foo.txt") as f:
                 data = f.read()
         """
-        provider, internal = self._resolve(path)
-        try:
-            return provider.open(internal)
-        except FileNotFoundError:
-            raise AssetNotFound(path) from None
+        provider, internal = self._find_provider(path)
+        return provider.open(internal)
 
     def exists(self, path: str) -> bool:
         """Return whether a file exists at the given path."""
         try:
-            provider, internal = self._resolve(path)
-            return provider.exists(internal)
+            self._find_provider(path)
+            return True
         except AssetNotFound:
             return False
 
