@@ -725,7 +725,7 @@ class Renderer:
 
         This primitive is intended for debug overlays, simple HUD elements,
         and custom immediate drawing inside games. Professional tooling GUIs
-        are built with an external library such as Dear PyGui (see demos/).
+        are built with the engine's own GUI widget library.
         """
         if not text:
             return

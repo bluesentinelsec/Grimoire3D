@@ -14,9 +14,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-tools = [
-    "dearpygui>=2.0.0",
-]
+# Dear PyGui is deliberately *not* used. We maintain an in-house GUI widget
+# library built directly on the engine's Renderer. This is required for
+# correct integration with split-screen / multi-viewport rendering.
+
 
 [tool.setuptools.packages.find]
 where = ["src"]

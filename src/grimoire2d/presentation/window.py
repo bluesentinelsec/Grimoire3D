@@ -132,17 +132,29 @@ class GameWindow:
         pygame.font.init()
         _set_gl_context_attributes()
 
-        desk_sizes = pygame.display.get_desktop_sizes()
-        log_w, log_h = desk_sizes[0] if desk_sizes else (virtual_width, virtual_height)
+        # Choose a reasonable initial logical window size (around 1.5x virtual).
+        # Avoid full desktop to prevent decoration/titlebar mismatches on macOS etc.
+        # The user can immediately resize; VIDEORESIZE will handle it.
+        log_w = int(virtual_width * 1.5)
+        log_h = int(virtual_height * 1.5)
 
         flags = pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
         pygame.display.set_mode((log_w, log_h), flags)
         pygame.display.set_caption(title)
 
+        # Enable key repeat so holding Backspace/Delete/etc in Entry/Text widgets
+        # feels responsive (delay, interval in ms). Games that don't want repeat
+        # can call pygame.key.set_repeat(0, 0) after.
+        pygame.key.set_repeat(300, 50)
+
+        # After set_mode, query the actual sizes (OS may adjust for decorations).
+        actual_log = pygame.display.get_window_size()
+        log_w, log_h = actual_log
+
         # Drawable pixels may differ from logical pixels on HiDPI displays.
         draw_w, draw_h = get_drawable_size(log_w, log_h)
-        self._px_ratio_x: float = draw_w / log_w
-        self._px_ratio_y: float = draw_h / log_h
+        self._px_ratio_x: float = draw_w / log_w if log_w else 1.0
+        self._px_ratio_y: float = draw_h / log_h if log_h else 1.0
 
         ctx = moderngl.create_context()
         ctx.enable(moderngl.BLEND)
@@ -221,20 +233,18 @@ class GameWindow:
         vp = self._renderer.viewport
         if vp.viewport_width <= 0 or vp.viewport_height <= 0:
             return 0.0, 0.0
-        # Viewport offsets and sizes are in physical (drawable) pixels.
-        # Mouse and resize events are in logical pixels; apply the ratio.
-        phys_l = vp.offset_x
-        phys_t = vp.offset_y
-        phys_w = vp.viewport_width
-        phys_h = vp.viewport_height
 
-        log_l = phys_l / self._px_ratio_x
-        log_t = phys_t / self._px_ratio_y
-        log_w = phys_w / self._px_ratio_x
-        log_h = phys_h / self._px_ratio_y
+        # Convert the logical mouse position (from pygame) into physical pixels
+        # using the HiDPI ratio. This ensures the mapping uses the exact same
+        # physical numbers that the renderer used for glViewport and drawing
+        # placement, avoiding mismatches on retina/HiDPI (especially macOS).
+        phys_x = x * self._px_ratio_x
+        phys_y = y * self._px_ratio_y
 
-        vx = (x - log_l) / log_w * self._virt_w
-        vy = (y - log_t) / log_h * self._virt_h
+        # Use the top-left-based offsets (from physical window edge to content area).
+        # These match the letterboxed region where virtual (0,0) is drawn.
+        vx = (phys_x - vp.offset_x) / vp.viewport_width * self._virt_w
+        vy = (phys_y - vp.offset_y) / vp.viewport_height * self._virt_h
         return vx, vy
 
     # ------------------------------------------------------------------ #

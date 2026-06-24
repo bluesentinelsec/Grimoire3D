@@ -15,8 +15,9 @@ Example::
 
 from __future__ import annotations
 
-from . import archive, vfs
+from . import archive, tiled, vfs
 from .archive import create_archive, extract_archive
+from .tiled import load_tiled_map
 from .vfs import (
     DirProvider,
     MemoryProvider,
@@ -29,6 +30,8 @@ __all__ = [
     "archive",
     "create_archive",
     "extract_archive",
+    "tiled",
+    "load_tiled_map",
     "vfs",
     "VFS",
     "VirtualFileSystem",
