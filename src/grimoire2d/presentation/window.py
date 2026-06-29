@@ -103,6 +103,10 @@ class GameWindow:
     space to fill as much of the physical window as possible while preserving
     the aspect ratio, with letterbox/pillarbox bars filling the remainder.
 
+    For crisp text in the in-house GUI (or text primitives), supply a high
+    quality TTF via ``font_path`` or (preferred for embedding/VFS) ``font_bytes``
+    loaded e.g. via ``vfs.read_bytes("fonts/serif.ttf")``.
+
     Typical usage::
 
         win = GameWindow("My Game", virtual_width=1280, virtual_height=720)
@@ -125,6 +129,10 @@ class GameWindow:
         virtual_height: int = 720,
         target_fps: int = 60,
         bar_color: tuple[int, int, int, int] = (0, 0, 0, 255),
+        *,
+        font_path: str | None = None,
+        font_bytes: bytes | None = None,
+        render_scale: float = 1.0,
     ) -> None:
         # HiDPI hints must be set before pygame.init().
         enable_highdpi()
@@ -132,17 +140,34 @@ class GameWindow:
         pygame.font.init()
         _set_gl_context_attributes()
 
-        desk_sizes = pygame.display.get_desktop_sizes()
-        log_w, log_h = desk_sizes[0] if desk_sizes else (virtual_width, virtual_height)
+        # Choose a reasonable initial logical window size (around 1.5x virtual).
+        # Avoid full desktop to prevent decoration/titlebar mismatches on macOS etc.
+        # The user can immediately resize; VIDEORESIZE will handle it.
+        log_w = int(virtual_width * 1.5)
+        log_h = int(virtual_height * 1.5)
 
         flags = pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
         pygame.display.set_mode((log_w, log_h), flags)
         pygame.display.set_caption(title)
 
+        # Enable key repeat so holding Backspace/Delete/etc in Entry/Text widgets
+        # feels responsive (delay, interval in ms). Games that don't want repeat
+        # can call pygame.key.set_repeat(0, 0) after.
+        pygame.key.set_repeat(300, 50)
+
+        # After set_mode, query the actual sizes (OS may adjust for decorations).
+        actual_log = pygame.display.get_window_size()
+        log_w, log_h = actual_log
+
         # Drawable pixels may differ from logical pixels on HiDPI displays.
         draw_w, draw_h = get_drawable_size(log_w, log_h)
-        self._px_ratio_x: float = draw_w / log_w
-        self._px_ratio_y: float = draw_h / log_h
+        self._px_ratio_x: float = draw_w / log_w if log_w else 1.0
+        self._px_ratio_y: float = draw_h / log_h if log_h else 1.0
+
+        # Font scale for crisp text on HiDPI. On Retina this is typically 2.0.
+        # We supersample font rasterization by this factor so glyphs have native
+        # device pixel detail while still occupying the correct virtual size.
+        font_scale = (self._px_ratio_x + self._px_ratio_y) / 2.0 or 1.0
 
         ctx = moderngl.create_context()
         ctx.enable(moderngl.BLEND)
@@ -156,7 +181,10 @@ class GameWindow:
         vr = VirtualResolution(
             width=virtual_width, height=virtual_height, integer_scaling=False
         )
-        self._renderer = Renderer(ctx, vr)
+        self._renderer = Renderer(
+            ctx, vr, font_path=font_path, font_bytes=font_bytes, font_scale=font_scale
+        )
+        self._renderer.set_render_scale(render_scale)
         self._renderer.set_clear_color(bar_color)
         self._renderer.handle_physical_resize(draw_w, draw_h)
 
@@ -221,20 +249,18 @@ class GameWindow:
         vp = self._renderer.viewport
         if vp.viewport_width <= 0 or vp.viewport_height <= 0:
             return 0.0, 0.0
-        # Viewport offsets and sizes are in physical (drawable) pixels.
-        # Mouse and resize events are in logical pixels; apply the ratio.
-        phys_l = vp.offset_x
-        phys_t = vp.offset_y
-        phys_w = vp.viewport_width
-        phys_h = vp.viewport_height
 
-        log_l = phys_l / self._px_ratio_x
-        log_t = phys_t / self._px_ratio_y
-        log_w = phys_w / self._px_ratio_x
-        log_h = phys_h / self._px_ratio_y
+        # Convert the logical mouse position (from pygame) into physical pixels
+        # using the HiDPI ratio. This ensures the mapping uses the exact same
+        # physical numbers that the renderer used for glViewport and drawing
+        # placement, avoiding mismatches on retina/HiDPI (especially macOS).
+        phys_x = x * self._px_ratio_x
+        phys_y = y * self._px_ratio_y
 
-        vx = (x - log_l) / log_w * self._virt_w
-        vy = (y - log_t) / log_h * self._virt_h
+        # Use the top-left-based offsets (from physical window edge to content area).
+        # These match the letterboxed region where virtual (0,0) is drawn.
+        vx = (phys_x - vp.offset_x) / vp.viewport_width * self._virt_w
+        vy = (phys_y - vp.offset_y) / vp.viewport_height * self._virt_h
         return vx, vy
 
     # ------------------------------------------------------------------ #
@@ -262,21 +288,24 @@ class GameWindow:
         return result
 
     def begin_frame(self) -> float:
-        """Tick the clock and set up the GL frame.  Returns delta-time in seconds.
+        """Tick the clock and prepare the GL frame.  Returns delta-time in seconds.
 
-        Internally calls ``renderer.prepare_frame()`` which:
-        - Fills letterbox/pillarbox bars with the bar color
-        - Clears the game viewport
-        - Positions the GL viewport inside the physical window
-
-        Draw using ``win.renderer`` after this call.
+        Always renders at the native physical resolution (render_scale=1.0 by
+        default).  Dynamic resolution scaling, if desired, must be enabled
+        explicitly by the caller via renderer.set_render_scale() — the engine
+        never silently reduces quality on its own, mirroring the default
+        behaviour of Godot, Unity, and Unreal Engine.
         """
         self._dt = self._clock.tick(self._target_fps) / 1000.0
         self._renderer.prepare_frame()
         return self._dt
 
     def end_frame(self) -> None:
-        """Flush renderer batches and flip the back buffer to the screen."""
+        """Flush renderer batches and flip the back buffer to the screen.
+
+        If a reduced-res world FBO was used, it is upscaled here.
+        """
+        self._renderer.end_world_render()
         self._renderer.present()
         pygame.display.flip()
 
@@ -293,7 +322,13 @@ class GameWindow:
         pygame.quit()
 
 
-def open_and_run(app_state: AppState | None = None) -> None:
+def open_and_run(
+    app_state: AppState | None = None,
+    *,
+    font_path: str | None = None,
+    font_bytes: bytes | None = None,
+    render_scale: float = 1.0,
+) -> None:
     """Open a resizable (or fullscreen) window driven by the data models
     and run until quit.
 
@@ -335,6 +370,13 @@ def open_and_run(app_state: AppState | None = None) -> None:
     caption = title.value if title is not None else "Grimoire2D"
     pygame.display.set_caption(caption)
 
+    # Compute HiDPI scale for crisp text (mirrors GameWindow logic).
+    draw_w, draw_h = get_drawable_size(width, height)
+    px_ratio = (
+        (draw_w / width if width else 1.0) + (draw_h / height if height else 1.0)
+    ) / 2.0 or 1.0
+    font_scale = px_ratio
+
     # Video settings for vsync / clear color (best effort)
     video = app_state.engine.extensions.get("video")
     if video is None or not isinstance(video, VideoSettings):
@@ -345,7 +387,14 @@ def open_and_run(app_state: AppState | None = None) -> None:
         pass  # older pygame-ce or platform may not support
 
     ctx = moderngl.create_context()
-    renderer = Renderer(ctx, initial_virtual=virt)
+    renderer = Renderer(
+        ctx,
+        initial_virtual=virt,
+        font_path=font_path,
+        font_bytes=font_bytes,
+        font_scale=font_scale,
+    )
+    renderer.set_render_scale(render_scale)
     renderer.set_clear_color(video.clear_color)
 
     # Track current physical size for the data-driven path
@@ -409,7 +458,15 @@ def open_and_run(app_state: AppState | None = None) -> None:
     pygame.quit()
 
 
-def open_window_with_config(engine_config: EngineConfig) -> None:
+def open_window_with_config(
+    engine_config: EngineConfig,
+    *,
+    font_path: str | None = None,
+    font_bytes: bytes | None = None,
+    render_scale: float = 1.0,
+) -> None:
     """Convenience for using just the engine config (for early testing)."""
     app_state = AppState(engine=engine_config)
-    open_and_run(app_state)
+    open_and_run(
+        app_state, font_path=font_path, font_bytes=font_bytes, render_scale=render_scale
+    )
