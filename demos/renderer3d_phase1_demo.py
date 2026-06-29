@@ -60,23 +60,25 @@ WIRE_C = (0.9,  0.9,  0.2,  1.0)   # wireframe yellow
 # Main
 # ---------------------------------------------------------------------------
 
+SKY_COLOR = (0.05, 0.07, 0.18, 1.0)   # deep blue night sky
+
+
 def run() -> None:
     win = GameWindow(
         "Grimoire2D — 3D Phase 1",
         virtual_width=VIRTUAL_W,
         virtual_height=VIRTUAL_H,
         target_fps=60,
-        bar_color=(5, 5, 10, 255),
+        bar_color=(5, 5, 15, 255),
     )
-    win.renderer.set_clear_color((10, 12, 18, 255))  # dark night-sky background
 
     # 3D renderer shares the same GL context as the 2D renderer
     settings = RenderSettings3D(
         specular=True,
         fog=False,
-        fog_color=(0.08, 0.1, 0.14),
-        fog_near=14.0,
-        fog_far=40.0,
+        fog_color=(0.05, 0.07, 0.18),   # matches sky
+        fog_near=18.0,
+        fog_far=50.0,
     )
     r3d = Renderer3D(win.ctx, settings)
 
@@ -85,34 +87,32 @@ def run() -> None:
     # at most 100 ms — no spiral of death.
     ts = FixedTimestep(physics_hz=PHYSICS_HZ, max_dt=settings.max_dt)
 
-    # Camera — fixed overhead angle for Phase 1 (free-look in Phase 2)
+    # Camera — closer, slightly lower angle so objects fill more of the frame
     camera = PerspectiveCamera(
-        position=(0.0, 6.0, 14.0),
+        position=(0.0, 5.0, 11.0),
         yaw=-90.0,
-        pitch=-22.0,
-        fov=70.0,
+        pitch=-18.0,
+        fov=75.0,
     )
 
-    # Lights
-    ambient  = AmbientLight(color=(0.05, 0.05, 0.08))
-    sun      = DirectionalLight(
-        direction=(0.4, -1.0, -0.6),
-        color=(0.9, 0.85, 0.75),
-        intensity=0.6,
+    # Lights — bright enough to be clearly visible
+    ambient = AmbientLight(color=(0.18, 0.2, 0.30))   # blue-tinted night ambient
+    sun = DirectionalLight(
+        direction=(0.3, -0.8, -0.5),           # slightly front-above
+        color=(0.95, 0.90, 0.80),              # warm sunlight
+        intensity=1.6,
     )
     # Three coloured point lights that orbit the scene
     pl_colors = [
-        (1.0, 0.25, 0.1),   # red-orange
-        (0.1, 0.5,  1.0),   # cool blue
-        (0.2, 1.0,  0.35),  # green
+        (1.0, 0.30, 0.05),   # orange-red
+        (0.15, 0.55, 1.0),   # cool blue
+        (0.15, 1.0,  0.40),  # green
     ]
     pl_offsets = [0.0, 2.0 * math.pi / 3.0, 4.0 * math.pi / 3.0]
 
     # Animation state (driven by fixed steps, displayed with interpolation)
     anim_time: float = 0.0
     wireframe: bool  = False
-
-    clock_ref = [0.0]   # raw elapsed for HUD readout only
 
     while win.is_open:
         # --- Input ---
@@ -141,39 +141,40 @@ def run() -> None:
         # --- Compute animated transforms ---
         # Three boxes rotating at different speeds and axes
         box_transforms = [
-            # (position,      size,       color,  rot_axis,        rot_speed, phase)
-            ((-3.5, 0.7, 0.0), (1.4,1.4,1.4), RED,   (0,1,0), 0.8,  0.0),
-            (( 3.5, 0.7, 0.0), (1.2,1.6,1.2), GREEN, (1,0,0), 1.1,  1.0),
-            (( 0.0, 0.7,-3.5), (1.3,1.3,1.3), BLUE,  (0.6,0.8,0), 0.6, 2.1),
+            # (position,         size,          color,  rot_axis,    speed, phase)
+            ((-3.5, 0.75, 0.0), (1.5, 1.5, 1.5), RED,   (0, 1, 0),   0.8,  0.0),
+            (( 3.5, 0.75, 0.0), (1.3, 1.7, 1.3), GREEN, (1, 0, 0),   1.1,  1.0),
+            (( 0.0, 0.75,-3.5), (1.4, 1.4, 1.4), BLUE,  (0.6,0.8,0), 0.6,  2.1),
         ]
 
-        # Orbiting point lights
+        # Orbiting point lights — tighter orbit so they stay close to objects
         point_lights = []
         for color, offset in zip(pl_colors, pl_offsets):
-            angle = t * 0.9 + offset
+            angle = t * 0.8 + offset
             px = math.cos(angle) * LIGHT_ORBIT_RADIUS
             pz = math.sin(angle) * LIGHT_ORBIT_RADIUS
             point_lights.append(PointLight(
                 position=(px, LIGHT_HEIGHT, pz),
                 color=color,
-                intensity=2.0,
-                radius=11.0,
+                intensity=4.5,     # bright — need to clearly illuminate objects
+                radius=14.0,       # generous radius so all objects are touched
             ))
 
         # Pulsing center sphere scale
-        sphere_r = 0.9 + 0.15 * math.sin(t * 2.3)
+        sphere_r = 1.0 + 0.18 * math.sin(t * 2.3)
 
         # --- 3D render pass ---
         r3d.begin_scene(
             camera,
             win.viewport,
+            sky_color=SKY_COLOR,
             ambient=ambient,
             dir_light=sun,
             point_lights=point_lights,
         )
 
-        # Ground plane
-        r3d.draw_plane((0.0, 0.0, 0.0), size=22.0, color=(0.18, 0.19, 0.22, 1.0))
+        # Ground plane — mid-grey so lighting changes are obvious
+        r3d.draw_plane((0.0, 0.0, 0.0), size=24.0, color=(0.35, 0.37, 0.40, 1.0))
 
         # Rotating boxes (solid)
         for (pos, sz, col, axis, speed, phase) in box_transforms:

@@ -245,22 +245,32 @@ class Renderer3D:
         camera: "PerspectiveCamera",
         viewport: "Viewport",
         *,
+        sky_color: tuple[float, float, float, float] = (0.05, 0.07, 0.15, 1.0),
         ambient: AmbientLight | None = None,
         dir_light: DirectionalLight | None = None,
         point_lights: list[PointLight] | None = None,
     ) -> None:
-        """Set GL state and upload per-frame uniforms.
+        """Set GL state, clear the viewport, and upload per-frame uniforms.
 
-        Call once per frame before any draw_* calls.  The viewport is the
-        letterboxed region returned by GameWindow.viewport — 3D and 2D
-        share the same on-screen rect so aspect ratios match.
+        Call once per frame before any draw_* calls.  ``sky_color`` is the
+        background RGBA (0‥1) — the 3D renderer owns this clear rather than
+        relying on the 2D renderer's prepare_frame, mirroring how Godot/Unity
+        handle camera clear flags.
+
+        The viewport is the letterboxed region from GameWindow.viewport so 3D
+        and 2D HUD share the same on-screen rect and aspect ratio.
         """
         vp = viewport
         self.ctx.viewport = (vp.viewport_x, vp.viewport_y, vp.viewport_width, vp.viewport_height)
         self.ctx.enable(moderngl.DEPTH_TEST)
         self.ctx.depth_func = "<"
-        # Clear only depth — color was already cleared by 2D renderer's prepare_frame.
-        self.ctx.clear(depth=True)
+        # Clear colour + depth for this viewport region.  moderngl has no
+        # depth-only clear, so we pass our desired sky colour as the clear
+        # colour and let it reset depth to 1.0 at the same time.
+        r, g, b, a = sky_color
+        self.ctx.clear(r, g, b, a, depth=1.0,
+                       viewport=(vp.viewport_x, vp.viewport_y,
+                                 vp.viewport_width, vp.viewport_height))
 
         aspect = vp.viewport_width / vp.viewport_height if vp.viewport_height else 1.0
         view = camera.get_view_matrix()
