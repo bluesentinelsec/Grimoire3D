@@ -45,6 +45,11 @@ class GUIManager:
         self._popups: list[
             Widget
         ] = []  # transient posted popups (menus etc), drawn/hit on top
+
+        # Separate UI scale for consistent appearance across display sizes
+        # and when world render_scale changes. UI coordinates are in "UI logical"
+        # units; multiply by ui_scale for physical screen pixels.
+        self.ui_scale: float = 1.0
         self._renderer: Optional[Renderer] = (
             None  # persisted for measurements during input etc.
         )
@@ -78,17 +83,40 @@ class GUIManager:
         # Otherwise leaf widgets keep their measured size or explicit size
 
     def draw(self, renderer: Renderer) -> None:
-        """Draw the entire GUI tree + any transient popups (e.g. menus) on top."""
+        """Draw the entire GUI tree + any transient popups (e.g. menus) on top.
+
+        UI logical coordinates are scaled by ui_scale at draw time so that
+        the same logical layout produces consistent physical size (and crisp
+        appearance) across different display resolutions and world render scales.
+        """
         if renderer is not None:
             self._renderer = renderer
         self._current_renderer = renderer
+        s = getattr(self, "ui_scale", 1.0) or 1.0
         if self.root is not None:
+            if abs(s - 1.0) > 1e-6:
+                self._scale_tree(self.root, s)
             self.root.draw(self)  # type: ignore[arg-type]
+            if abs(s - 1.0) > 1e-6:
+                self._scale_tree(self.root, 1.0 / s)
         # Draw popups last so they appear above all normal content
         for popup in self._popups:
             if getattr(popup, "_visible", True):
+                if abs(s - 1.0) > 1e-6:
+                    self._scale_tree(popup, s)
                 popup.draw(self)  # type: ignore[arg-type]
+                if abs(s - 1.0) > 1e-6:
+                    self._scale_tree(popup, 1.0 / s)
         self._current_renderer = None
+
+    def _scale_tree(self, widget: "Widget", factor: float) -> None:
+        """Temporarily scale widget geometry for draw-time UI scaling."""
+        widget.x *= factor
+        widget.y *= factor
+        widget.width *= factor
+        widget.height *= factor
+        for child in getattr(widget, "children", []):
+            self._scale_tree(child, factor)
 
     _current_renderer: Optional[Renderer] = None
 
@@ -97,7 +125,13 @@ class GUIManager:
     # ------------------------------------------------------------------
 
     def handle_mouse(self, x: float, y: float, pressed: bool) -> None:
-        """Update hover / press state. Call every frame with virtual mouse."""
+        """Update hover / press state. Call every frame with *physical* mouse.
+
+        Mouse coords are converted using ui_scale to the GUI's logical space.
+        """
+        if self.ui_scale != 1.0 and self.ui_scale > 0:
+            x = x / self.ui_scale
+            y = y / self.ui_scale
         self._last_mouse_pos = (x, y)
 
         if self.root is None and not self._popups:

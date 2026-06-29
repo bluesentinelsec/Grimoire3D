@@ -18,10 +18,12 @@ added in later increments on top of this foundation.
 from __future__ import annotations
 
 import array
+from io import BytesIO
 
 import moderngl
 import pygame
 
+from grimoire2d.logic.camera import Camera
 from grimoire2d.logic.scaling import Viewport, compute_viewport
 from grimoire2d.models import VirtualResolution
 from grimoire2d.presentation.batch import (
@@ -103,13 +105,30 @@ class Renderer:
     """
 
     def __init__(
-        self, ctx: moderngl.Context, initial_virtual: VirtualResolution | None = None
+        self,
+        ctx: moderngl.Context,
+        initial_virtual: VirtualResolution | None = None,
+        *,
+        font_path: str | None = None,
+        font_bytes: bytes | None = None,
+        font_scale: float = 1.0,
     ) -> None:
         """Initialise the renderer with a live moderngl context.
 
         Args:
             ctx: The moderngl context created by the window bootstrap.
             initial_virtual: Starting virtual resolution; defaults to 1280x720.
+            font_path: Optional path to a .ttf/.otf font file to use instead of
+                the default pygame font. Loaded via pygame.font.Font.
+            font_bytes: Optional raw font file bytes (e.g. from VFS.read_bytes).
+                Takes precedence over font_path if both provided. This allows
+                embedding fonts or loading via VFS without filesystem paths at
+                draw time.
+            font_scale: Multiplier for internal font rasterization size.
+                On HiDPI/Retina displays this is typically 2.0 so that glyphs
+                are rendered at device-pixel resolution for crisp results
+                while still occupying the correct size in virtual coordinates.
+                Default 1.0 for standard DPI.
         """
         self.ctx = ctx
         self._virt = initial_virtual or VirtualResolution()
@@ -117,6 +136,19 @@ class Renderer:
         self._viewport: Viewport = compute_viewport(
             self._virt, self._phys[0], self._phys[1]
         )
+        self._font_path = font_path
+        self._font_bytes = font_bytes
+        self._font_scale = (
+            max(1.0, float(font_scale)) if font_scale is not None else 1.0
+        )
+
+        # Dynamic render scale (for FPS fallback) and world render target (FBO)
+        self.render_scale: float = 1.0
+        self._world_texture: moderngl.Texture | None = None
+        self._world_fbo: moderngl.Framebuffer | None = None
+        self._current_camera: Camera = Camera()
+
+        self._rebuild_world_target()
 
         # Legacy solid-colour program (kept for backward compatibility)
         vert_src = get_default_vertex_shader()
@@ -189,6 +221,33 @@ class Renderer:
         self._text_vao = self.ctx.vertex_array(
             self.text_program,
             [(self._textured_quad_vbo, "2f 2f", "in_pos", "in_texcoord")],
+        )
+
+        # FBO blit quad: same positions as the text quad but V texture coordinates
+        # are flipped (1→0 instead of 0→1).
+        #
+        # Why: text textures are uploaded from pygame surface bytes, which OpenGL
+        # treats as bottom-row-first.  That implicit upload-flip combined with our
+        # Y-down projection produces correct on-screen text.  FBO textures have no
+        # upload-flip — they store exactly what was rendered — so the same quad
+        # would sample the FBO upside-down.  Pre-flipping V here restores the
+        # correct orientation without touching anything else in the pipeline.
+        _fbo_blit_data = array.array(
+            "f",
+            [
+                # pos x  pos y  tex u  tex v (V flipped: 1 at top, 0 at bottom)
+                0.0,   0.0,   0.0,   1.0,   # top-left     → FBO top
+                1.0,   0.0,   1.0,   1.0,   # top-right    → FBO top
+                1.0,   1.0,   1.0,   0.0,   # bottom-right → FBO bottom
+                0.0,   0.0,   0.0,   1.0,   # top-left
+                1.0,   1.0,   1.0,   0.0,   # bottom-right
+                0.0,   1.0,   0.0,   0.0,   # bottom-left  → FBO bottom
+            ],
+        )
+        self._fbo_blit_vbo = self.ctx.buffer(_fbo_blit_data.tobytes())
+        self._fbo_blit_vao = self.ctx.vertex_array(
+            self.text_program,
+            [(self._fbo_blit_vbo, "2f 2f", "in_pos", "in_texcoord")],
         )
 
         self._projection: tuple[float, ...] = _ortho(
@@ -310,43 +369,175 @@ class Renderer:
             return
         self._phys = (physical_width, physical_height)
         self._viewport = compute_viewport(self._virt, physical_width, physical_height)
+        self._rebuild_world_target()
+
+    def set_render_scale(self, scale: float) -> None:
+        """Set the internal world render resolution scale (0.25..1.0).
+
+        1.0 = full native display resolution for crisp results.
+        <1.0 renders the world to a smaller FBO then upscales to window.
+        Used for automatic quality reduction when FPS cannot be sustained.
+        """
+        self.render_scale = max(0.25, min(1.0, float(scale)))
+        self._rebuild_world_target()
+
+    def set_camera(self, camera: Camera) -> None:
+        """Set the current camera used for world-to-screen mapping."""
+        self._current_camera = camera
+
+    @property
+    def camera(self) -> Camera:
+        return self._current_camera
+
+    def _rebuild_world_target(self) -> None:
+        if self._world_fbo is not None:
+            try:
+                self._world_fbo.release()
+            except Exception:
+                pass
+            self._world_fbo = None
+        if self._world_texture is not None:
+            try:
+                self._world_texture.release()
+            except Exception:
+                pass
+            self._world_texture = None
+
+        if self.render_scale >= 0.999 or self._phys[0] <= 0:
+            return
+
+        # Size the FBO to the viewport (letterboxed content region), not the
+        # full physical window.  This preserves the virtual aspect ratio inside
+        # the FBO so the projection-to-NDC mapping is correct when blitting back.
+        vp = self._viewport
+        fbo_w = max(1, int(vp.viewport_width * self.render_scale))
+        fbo_h = max(1, int(vp.viewport_height * self.render_scale))
+        self._world_texture = self.ctx.texture((fbo_w, fbo_h), 4)
+        self._world_texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
+        self._world_fbo = self.ctx.framebuffer(color_attachments=[self._world_texture])
 
     def set_clear_color(self, color: tuple[int, int, int, int]) -> None:
         """Update the game area clear color (from VideoSettings etc.)."""
         self._game_clear = color
 
     def prepare_frame(self) -> None:
-        """Prepare letterbox bars + game viewport for the current frame.
+        """Prepare for the current frame.
 
-        Must be called every frame (or on any virt/resize change before draws).
-        Clears the full physical window to the bar color, then sets the
-        letterboxed viewport and clears the game area to the configured color.
-        All subsequent draw_* calls will land inside the game rect.
+        Supports native-resolution rendering + optional reduced internal
+        resolution (FBO) for performance.
+        - If render_scale < 1.0, the world is rendered to a smaller FBO.
+        - The FBO is then upscaled (LINEAR) to the full physical window.
+        - UI / overlays should be drawn *after* world, at full resolution.
         """
-        vp = self._viewport
         phys_w, phys_h = self._phys
 
         # Disable any scissor left over from the previous frame
         self.ctx.scissor = None
         self._clip_stack.clear()
 
-        # Full window clear for the bars/pillarbox
+        use_fbo = self._world_fbo is not None and self.render_scale < 0.999
+
+        if use_fbo:
+            self._world_fbo.use()
+            w = self._world_texture.width
+            h = self._world_texture.height
+            self.ctx.viewport = (0, 0, w, h)
+            r, g, b, a = (c / 255.0 for c in self._game_clear)
+            self.ctx.clear(r, g, b, a)
+            # Keep virtual coordinate space so draw calls are the same regardless
+            # of whether the FBO or the screen is the active render target.
+            self._set_projection_for_size(self._virt.width, self._virt.height)
+        else:
+            # Full physical for native res or legacy letterbox path
+            self.ctx.screen.use()
+            self.ctx.viewport = (0, 0, phys_w, phys_h)
+            r, g, b, a = (c / 255.0 for c in self._bar_color)
+            self.ctx.clear(r, g, b, a)
+
+            vp = self._viewport
+            self.ctx.viewport = (
+                vp.viewport_x,
+                vp.viewport_y,
+                vp.viewport_width,
+                vp.viewport_height,
+            )
+            r, g, b, a = (c / 255.0 for c in self._game_clear)
+            self.ctx.clear(r, g, b, a)
+
+            # Always project in virtual coordinate space so draw calls at
+            # (0..virt_w, 0..virt_h) correctly fill the letterboxed viewport
+            # regardless of the physical scale factor.
+            self._set_projection_for_size(self._virt.width, self._virt.height)
+
+        self.ctx.enable(moderngl.BLEND)
+        self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
+
+    def _set_projection_for_size(self, width: int, height: int) -> None:
+        """Set ortho projection to match the current target size (physical or fbo)."""
+        proj = _ortho(0.0, float(width), 0.0, float(height))
+        for prog in (
+            self.program,
+            self.text_program,
+            self._shape_program,
+            self._sprite_program,
+            self._polygon_program,
+            self._pixel_buffer_program,
+        ):
+            try:
+                prog["u_projection"].value = proj
+            except Exception:
+                pass
+
+    def end_world_render(self) -> None:
+        """Blit the reduced-resolution world FBO back to the screen.
+
+        The FBO is sized to the letterboxed viewport (same aspect ratio as the
+        virtual canvas) so no stretch distortion occurs.  The blit uses a
+        viewport-local projection so it fills exactly the content region,
+        leaving the bar areas untouched.  After blitting the virtual projection
+        is restored so UI/overlay draws continue in virtual coordinate space.
+        """
+        if self._world_fbo is None or self.render_scale >= 0.999:
+            return
+
+        self.ctx.screen.use()
+        phys_w, phys_h = self._phys
+
+        # Fill the full window with the bar colour (letterbox/pillarbox areas).
         self.ctx.viewport = (0, 0, phys_w, phys_h)
         r, g, b, a = (c / 255.0 for c in self._bar_color)
         self.ctx.clear(r, g, b, a)
 
-        # Game content viewport (letterboxed)
-        self.ctx.viewport = (
-            vp.viewport_x,
-            vp.viewport_y,
-            vp.viewport_width,
-            vp.viewport_height,
-        )
-        r, g, b, a = (c / 255.0 for c in self._game_clear)
-        self.ctx.clear(r, g, b, a)
+        if self._world_texture:
+            # Blit into the letterboxed content region only.
+            vp = self._viewport
+            self.ctx.viewport = (
+                vp.viewport_x, vp.viewport_y,
+                vp.viewport_width, vp.viewport_height,
+            )
+            # Use a viewport-local projection (0..vp_w, 0..vp_h) for the blit
+            # quad so that u_offset=(0,0) / u_scale=(vp_w, vp_h) fills it exactly,
+            # independent of the current virtual resolution.
+            blit_proj = _ortho(
+                0.0, float(vp.viewport_width), 0.0, float(vp.viewport_height)
+            )
+            self.text_program["u_projection"].value = blit_proj
+            self._world_texture.use(0)
+            self.text_program["u_offset"].value = (0.0, 0.0)
+            self.text_program["u_scale"].value = (
+                float(vp.viewport_width), float(vp.viewport_height)
+            )
+            self.text_program["u_color"].value = (1.0, 1.0, 1.0, 1.0)
+            self.text_program["u_texture"].value = 0
+            self._fbo_blit_vao.render()
 
-        self.ctx.enable(moderngl.BLEND)
-        self.ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
+            # Restore virtual-space projection and the full-window viewport so
+            # any subsequent UI/overlay draws use the correct coordinate space.
+            self.ctx.viewport = (
+                vp.viewport_x, vp.viewport_y,
+                vp.viewport_width, vp.viewport_height,
+            )
+            self._set_projection_for_size(self._virt.width, self._virt.height)
 
     def draw_rect(
         self,
@@ -687,17 +878,27 @@ class Renderer:
 
     # --- Text primitive support ---
 
-    def _get_font(self, size: int):
-        """Lazy cache for pygame fonts (default system font for the primitive).
+    def _get_font(self, raster_size: int):
+        """Lazy cache for pygame fonts at a specific rasterization size (in device pixels).
 
-        Font size is the base render size; the ``scale`` parameter in draw_text
-        then multiplies the resulting quad size in virtual coordinates.
+        The passed size should already be scaled by _font_scale for HiDPI.
+        Uses a custom TTF (from path or embedded bytes) if provided at
+        construction, otherwise falls back to pygame's default font.
         """
         if not hasattr(self, "_fonts"):
             self._fonts = {}
-        if size not in self._fonts:
-            self._fonts[size] = pygame.font.Font(None, size)
-        return self._fonts[size]
+        if raster_size not in self._fonts:
+            if self._font_bytes is not None:
+                self._fonts[raster_size] = pygame.font.Font(
+                    BytesIO(self._font_bytes), raster_size
+                )
+            elif self._font_path is not None:
+                self._fonts[raster_size] = pygame.font.Font(
+                    self._font_path, raster_size
+                )
+            else:
+                self._fonts[raster_size] = pygame.font.Font(None, raster_size)
+        return self._fonts[raster_size]
 
     def draw_text(
         self,
@@ -732,17 +933,26 @@ class Renderer:
 
         self._shape_batch.flush()
 
+        # Rasterize at a higher internal resolution on HiDPI so the resulting
+        # texture has enough samples to look crisp when mapped to device pixels.
+        raster_size = max(1, int(round(font_size * self._font_scale)))
+
         # Look up the cache first to skip rasterisation + upload for static labels.
-        cache_key = (text, font_size)
+        # Key includes the raster size so different scales don't collide.
+        cache_key = (text, raster_size)
         texture = self._text_cache.get(cache_key)
         if texture is None:
-            font = self._get_font(font_size)
+            font = self._get_font(raster_size)
             surf = font.render(text, True, (255, 255, 255)).convert_alpha()
             tw, th = surf.get_size()
             if tw <= 0 or th <= 0:
                 return
             data = pygame.image.tostring(surf, "RGBA", False)
             texture = self.ctx.texture((tw, th), 4, data)
+            # LINEAR filtering for text textures. Combined with HiDPI supersampled
+            # rasterization (font_scale) and position snapping, this provides
+            # reasonably crisp yet smooth text without the aliasing/chopping that
+            # NEAREST can produce on glyph edges.
             texture.filter = (moderngl.LINEAR, moderngl.LINEAR)
             # FIFO eviction at 512 entries to bound cache memory.
             if len(self._text_cache) >= 512:
@@ -753,8 +963,23 @@ class Renderer:
         tw, th = texture.width, texture.height
         texture.use(0)
 
-        self.text_program["u_offset"].value = (float(x), float(y))
-        self.text_program["u_scale"].value = (float(tw) * scale, float(th) * scale)
+        # Snap the quad origin to the font's internal (supersampled) pixel grid.
+        # This produces crisper results under LINEAR filtering, similar to how
+        # native UI text is positioned on integer device pixels.
+        s = self._font_scale
+        ox = round(float(x) * s) / s
+        oy = round(float(y) * s) / s
+        self.text_program["u_offset"].value = (ox, oy)
+
+        # The texture was rendered at raster_size pixels, but it represents
+        # 'font_size' virtual units. Compensate so the quad occupies the
+        # correct size in virtual space while using the high-res samples.
+        base_w = tw / self._font_scale
+        base_h = th / self._font_scale
+        self.text_program["u_scale"].value = (
+            float(base_w) * scale,
+            float(base_h) * scale,
+        )
         self.text_program["u_color"].value = color
         self.text_program["u_texture"].value = 0
 
@@ -769,9 +994,13 @@ class Renderer:
         """
         if not text:
             return 0.0, 0.0
-        font = self._get_font(font_size)
+        # Use the same raster size logic as draw_text so measurements match
+        # the actual on-screen size after HiDPI compensation.
+        raster_size = max(1, int(round(font_size * self._font_scale)))
+        font = self._get_font(raster_size)
         tw, th = font.size(text)
-        return tw * scale, th * scale
+        # Return size in virtual / logical units (the raster was supersampled).
+        return (tw / self._font_scale) * scale, (th / self._font_scale) * scale
 
     def draw_text_centered(
         self,

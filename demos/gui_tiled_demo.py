@@ -22,7 +22,7 @@ Layout is deliberately Tiled-inspired:
 Run:
     python -m demos.gui_tiled_demo
 
-Resize the window; the engine letterboxes the 1280x720 virtual surface.
+Resize the window; the engine letterboxes the virtual surface (now 1:1 with display for crispness).
 All widget positioning uses GridLayout (no hard-coded pixel positions for the widgets themselves).
 """
 
@@ -611,10 +611,38 @@ def main() -> None:
     print("Drag PanedWindow sashes. Use Sizegrip. Type in entries. Toggle checks, etc.")
     print("ESC to quit.")
 
+    # Use the user's display resolution for 1:1 virtual-to-physical mapping.
+    # This avoids scaling/letterbox blur and gives crisp output.
+    VIRTUAL_WIDTH = 1728
+    VIRTUAL_HEIGHT = 1117
+
+    # Load a high-quality embedded font (Source Serif 4).
+    # Loading bytes means the data can come from VFS (vfs.read_bytes(...))
+    # or be truly embedded (e.g. via package_data + importlib.resources).
+    # This path is for the local experiment; in a real game you'd package it.
+    font_bytes = None
+    font_candidates = [
+        "/Users/michaellong/Downloads/DM_Sans,EB_Garamond,IBM_Plex_Sans,Inter,Merriweather,etc-3/Source_Serif_4/static/SourceSerif4_18pt-Regular.ttf",
+        "/Users/michaellong/Downloads/DM_Sans,EB_Garamond,IBM_Plex_Sans,Inter,Merriweather,etc-3/Source_Serif_4/static/SourceSerif4_36pt-Regular.ttf",
+    ]
+    for fp in font_candidates:
+        try:
+            with open(fp, "rb") as f:
+                font_bytes = f.read()
+            print(f"Loaded custom font from {fp}")
+            break
+        except OSError:
+            continue
+    if font_bytes is None:
+        print(
+            "Warning: custom font not found at expected path; falling back to default (may look blurry)."
+        )
+
     win = GameWindow(
         "Grimoire2D — Tiled-like GUI Demo (all widgets)",
-        virtual_width=1280,
-        virtual_height=720,
+        virtual_width=VIRTUAL_WIDTH,
+        virtual_height=VIRTUAL_HEIGHT,
+        font_bytes=font_bytes,
     )
     r = win.renderer
 
@@ -645,10 +673,10 @@ def main() -> None:
         win.begin_frame()
 
         # Background
-        r.draw_rect(0, 0, 1280, 720, (0.12, 0.12, 0.14, 1.0))
+        r.draw_rect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT, (0.12, 0.12, 0.14, 1.0))
 
         # Drive the GUI
-        gui.layout(1280, 720, r)
+        gui.layout(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, r)
         gui.draw(r)
 
         # Update live state / labels / fake animation
@@ -658,7 +686,7 @@ def main() -> None:
         r.draw_text(
             f"Status: {state.status}   |   Tool: {state.current_tool}   |   Tiles: {len(state.placed_tiles)}",
             20,
-            700,
+            VIRTUAL_HEIGHT - 20,
             color=(0.7, 0.7, 0.75, 1.0),
             font_size=14,
         )
