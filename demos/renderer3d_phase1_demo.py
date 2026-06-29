@@ -95,18 +95,19 @@ def run() -> None:
         fov=75.0,
     )
 
-    # Lights — bright enough to be clearly visible
-    ambient = AmbientLight(color=(0.18, 0.2, 0.30))   # blue-tinted night ambient
+    # Lights: dim directional "moonlight" so point lights are the primary
+    # source — colored light pools and dynamic changes become clearly visible.
+    ambient = AmbientLight(color=(0.06, 0.06, 0.10))   # very dark blue-night fill
     sun = DirectionalLight(
-        direction=(0.3, -0.8, -0.5),           # slightly front-above
-        color=(0.95, 0.90, 0.80),              # warm sunlight
-        intensity=1.6,
+        direction=(0.3, -0.8, -0.5),
+        color=(0.6, 0.65, 0.80),    # cool moonlight tint
+        intensity=0.35,              # intentionally dim — point lights dominate
     )
-    # Three coloured point lights that orbit the scene
+    # Vivid point light colors with tight orbit so they clearly paint surfaces
     pl_colors = [
-        (1.0, 0.30, 0.05),   # orange-red
-        (0.15, 0.55, 1.0),   # cool blue
-        (0.15, 1.0,  0.40),  # green
+        (1.0, 0.20, 0.05),   # hot orange-red
+        (0.10, 0.45, 1.0),   # electric blue
+        (0.10, 1.0,  0.30),  # lime green
     ]
     pl_offsets = [0.0, 2.0 * math.pi / 3.0, 4.0 * math.pi / 3.0]
 
@@ -139,28 +140,32 @@ def run() -> None:
         t = anim_time + alpha * ts.step
 
         # --- Compute animated transforms ---
-        # Three boxes rotating at different speeds and axes
+        # Boxes spread in an arc so all three are visible from the camera.
+        # The third box moved from z=-3.5 (hidden behind the sphere) to a
+        # position alongside the others.
         box_transforms = [
-            # (position,         size,          color,  rot_axis,    speed, phase)
-            ((-3.5, 0.75, 0.0), (1.5, 1.5, 1.5), RED,   (0, 1, 0),   0.8,  0.0),
-            (( 3.5, 0.75, 0.0), (1.3, 1.7, 1.3), GREEN, (1, 0, 0),   1.1,  1.0),
-            (( 0.0, 0.75,-3.5), (1.4, 1.4, 1.4), BLUE,  (0.6,0.8,0), 0.6,  2.1),
+            # (position,          size,          color,  rot_axis,    speed, phase)
+            ((-4.0, 0.75,  1.0), (1.5, 1.5, 1.5), RED,   (0, 1, 0),   0.8,  0.0),
+            (( 4.0, 0.75,  1.0), (1.3, 1.7, 1.3), GREEN, (1, 0, 0),   1.1,  1.0),
+            (( 0.0, 0.75, -3.0), (1.4, 1.4, 1.4), BLUE,  (0.6,0.8,0), 0.6,  2.1),
         ]
 
-        # Orbiting point lights — tighter orbit so they stay close to objects
+        # Orbiting lights: tight radius so they pass close to objects and
+        # cast obvious colored patches.  Speed 1.2 makes the color shift
+        # clearly perceptible.
         point_lights = []
         for color, offset in zip(pl_colors, pl_offsets):
-            angle = t * 0.8 + offset
+            angle = t * 1.2 + offset
             px = math.cos(angle) * LIGHT_ORBIT_RADIUS
             pz = math.sin(angle) * LIGHT_ORBIT_RADIUS
             point_lights.append(PointLight(
                 position=(px, LIGHT_HEIGHT, pz),
                 color=color,
-                intensity=4.5,     # bright — need to clearly illuminate objects
-                radius=14.0,       # generous radius so all objects are touched
+                intensity=5.5,
+                radius=10.0,   # tighter falloff makes the pool shape obvious
             ))
 
-        # Pulsing center sphere scale
+        # Pulsing center sphere — white so it shows reflected light color clearly
         sphere_r = 1.0 + 0.18 * math.sin(t * 2.3)
 
         # --- 3D render pass ---
@@ -173,8 +178,8 @@ def run() -> None:
             point_lights=point_lights,
         )
 
-        # Ground plane — mid-grey so lighting changes are obvious
-        r3d.draw_plane((0.0, 0.0, 0.0), size=24.0, color=(0.35, 0.37, 0.40, 1.0))
+        # Dark ground plane — low albedo so colored light pools stand out
+        r3d.draw_plane((0.0, 0.0, 0.0), size=28.0, color=(0.22, 0.22, 0.24, 1.0))
 
         # Rotating boxes (solid)
         for (pos, sz, col, axis, speed, phase) in box_transforms:
@@ -190,14 +195,18 @@ def run() -> None:
                 slightly_larger = (sz[0]*1.02, sz[1]*1.02, sz[2]*1.02)
                 r3d.draw_box(pos, slightly_larger, WIRE_C, rotation=rot, wireframe=True)
 
-        # Center pulsing sphere
-        r3d.draw_sphere((0.0, sphere_r, 0.0), radius=sphere_r, color=SILVER)
-        r3d.draw_sphere((0.0, sphere_r, 0.0), radius=sphere_r * 1.02, color=WIRE_C, wireframe=wireframe)
+        # Center sphere — white so it cleanly reflects whatever light color
+        # happens to be nearest; the color shift is the most obvious proof
+        # that the dynamic point lights are working.
+        r3d.draw_sphere((0.0, sphere_r, 0.0), radius=sphere_r, color=WHITE)
+        if wireframe:
+            r3d.draw_sphere((0.0, sphere_r, 0.0), radius=sphere_r * 1.02,
+                            color=WIRE_C, wireframe=True)
 
-        # Small spheres marking each point light position
+        # Larger marker spheres at each light position so the orbiting sources
+        # are easy to track visually.
         for pl in point_lights:
-            r3d.draw_sphere(pl.position, radius=0.22,
-                            color=(*pl.color, 1.0))
+            r3d.draw_sphere(pl.position, radius=0.30, color=(*pl.color, 1.0))
 
         r3d.end_scene()
 
