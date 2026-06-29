@@ -298,14 +298,36 @@ class Renderer3D:
         else:
             p["u_dir_light_on"].value = False
 
-        # Point lights
-        lights = (point_lights or [])[: self.settings.max_point_lights]
+        # Point lights — upload as flat whole-array writes.
+        # macOS/Metal reports array uniforms under the base name only (u_pl_pos,
+        # not u_pl_pos[0]), so per-element indexed writes always KeyError.
+        # We pad to MAX_PL=8 and write the full flat tuple once.
+        MAX_PL = self.settings.max_point_lights
+        lights = (point_lights or [])[:MAX_PL]
         p["u_num_point_lights"].value = len(lights)
-        for i, pl in enumerate(lights):
-            _set(p, f"u_pl_pos[{i}]",       pl.position)
-            _set(p, f"u_pl_color[{i}]",     pl.color)
-            _set(p, f"u_pl_radius[{i}]",    pl.radius)
-            _set(p, f"u_pl_intensity[{i}]", pl.intensity)
+
+        # moderngl needs sequence-of-tuples for vec3 arrays, flat tuple for float arrays
+        pos_rows:  list[tuple] = []
+        col_rows:  list[tuple] = []
+        rad_flat:  list[float] = []
+        int_flat:  list[float] = []
+        for i in range(MAX_PL):
+            if i < len(lights):
+                pl = lights[i]
+                pos_rows.append(tuple(pl.position))
+                col_rows.append(tuple(pl.color))
+                rad_flat.append(float(pl.radius))
+                int_flat.append(float(pl.intensity))
+            else:
+                pos_rows.append((0.0, 0.0, 0.0))
+                col_rows.append((0.0, 0.0, 0.0))
+                rad_flat.append(1.0)
+                int_flat.append(0.0)
+
+        _set(p, "u_pl_pos",       tuple(pos_rows))
+        _set(p, "u_pl_color",     tuple(col_rows))
+        _set(p, "u_pl_radius",    tuple(rad_flat))
+        _set(p, "u_pl_intensity", tuple(int_flat))
 
         # Effect flags
         s = self.settings

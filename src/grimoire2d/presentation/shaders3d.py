@@ -110,24 +110,26 @@ void main() {
         }
     }
 
-    // Point lights — static upper bound (8) forces the driver to keep all
-    // array slots active at link time. A dynamic bound (u_num_point_lights)
-    // lets macOS/Metal prune array uniforms it considers statically unreachable.
+    // Point lights — static upper bound (8), guard with `if` (not `break`) so
+    // the compiler sees all 8 array slots as live at link time. On macOS/Metal
+    // a `break` proves upper slots are dead code and the driver prunes them,
+    // making u_pl_pos[3..7] disappear as registered uniforms even when
+    // u_num_point_lights < 8.  Using `if` keeps every slot nominally reachable.
     for (int i = 0; i < 8; i++) {
-        if (i >= u_num_point_lights) break;
+        if (i < u_num_point_lights) {
+            vec3  to_light = u_pl_pos[i] - v_world_pos;
+            float dist     = length(to_light);
+            vec3  L        = normalize(to_light);
 
-        vec3  to_light = u_pl_pos[i] - v_world_pos;
-        float dist     = length(to_light);
-        vec3  L        = normalize(to_light);
+            // Inverse-square falloff clamped to radius
+            float atten = clamp(1.0 - (dist / u_pl_radius[i]), 0.0, 1.0);
+            atten = atten * atten;
 
-        // Inverse-square falloff clamped to radius
-        float atten = clamp(1.0 - (dist / u_pl_radius[i]), 0.0, 1.0);
-        atten = atten * atten;
-
-        float NdL = max(dot(N, L), 0.0);
-        light_acc += u_pl_color[i] * u_pl_intensity[i] * NdL * atten;
-        if (u_specular_on) {
-            light_acc += u_pl_color[i] * spec_blinn(N, L, V, 128.0) * atten * 0.5;
+            float NdL = max(dot(N, L), 0.0);
+            light_acc += u_pl_color[i] * u_pl_intensity[i] * NdL * atten;
+            if (u_specular_on) {
+                light_acc += u_pl_color[i] * spec_blinn(N, L, V, 128.0) * atten * 0.5;
+            }
         }
     }
 
