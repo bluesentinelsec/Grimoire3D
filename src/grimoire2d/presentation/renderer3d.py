@@ -198,6 +198,14 @@ def _mat4_inv_t(m: glm.mat4) -> tuple:
     return _mat4(glm.transpose(glm.inverse(m)))
 
 
+def _set(prog: moderngl.Program, key: str, value) -> None:
+    """Set a uniform, silently skipping any slot the driver pruned at link time."""
+    try:
+        prog[key].value = value
+    except KeyError:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Renderer3D
 # ---------------------------------------------------------------------------
@@ -279,10 +287,10 @@ class Renderer3D:
         lights = (point_lights or [])[: self.settings.max_point_lights]
         p["u_num_point_lights"].value = len(lights)
         for i, pl in enumerate(lights):
-            p[f"u_pl_pos[{i}]"].value = pl.position
-            p[f"u_pl_color[{i}]"].value = pl.color
-            p[f"u_pl_radius[{i}]"].value = pl.radius
-            p[f"u_pl_intensity[{i}]"].value = pl.intensity
+            _set(p, f"u_pl_pos[{i}]",       pl.position)
+            _set(p, f"u_pl_color[{i}]",     pl.color)
+            _set(p, f"u_pl_radius[{i}]",    pl.radius)
+            _set(p, f"u_pl_intensity[{i}]", pl.intensity)
 
         # Effect flags
         s = self.settings

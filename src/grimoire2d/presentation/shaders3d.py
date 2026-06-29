@@ -110,8 +110,12 @@ void main() {
         }
     }
 
-    // Point lights
-    for (int i = 0; i < u_num_point_lights; i++) {
+    // Point lights — static upper bound (8) forces the driver to keep all
+    // array slots active at link time. A dynamic bound (u_num_point_lights)
+    // lets macOS/Metal prune array uniforms it considers statically unreachable.
+    for (int i = 0; i < 8; i++) {
+        if (i >= u_num_point_lights) break;
+
         vec3  to_light = u_pl_pos[i] - v_world_pos;
         float dist     = length(to_light);
         vec3  L        = normalize(to_light);
