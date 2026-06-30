@@ -267,8 +267,8 @@ def run() -> None:
                      virtual_height=VIRTUAL_H, target_fps=60, bar_color=(8, 10, 14, 255))
 
     settings = RenderSettings3D(specular=True, fog=True,
-                                 fog_color=(0.08, 0.10, 0.14),
-                                 fog_near=20.0, fog_far=38.0, shadows=True)
+                                 fog_color=(0.01, 0.01, 0.02),
+                                 fog_near=14.0, fog_far=28.0, shadows=True)
     r3d = Renderer3D(win.ctx, settings)
     ts  = FixedTimestep(physics_hz=PHYSICS_HZ, max_dt=settings.max_dt)
 
@@ -279,9 +279,9 @@ def run() -> None:
                              yaw=90.0, pitch=-8.0, fov=85.0,
                              speed=6.0, sensitivity=0.15)
 
-    ambient = AmbientLight(color=(0.04, 0.05, 0.08))
-    sun = DirectionalLight(direction=(-0.3, -0.8, 0.5), color=(0.80, 0.85, 1.0),
-                           intensity=0.6, enabled=True)
+    ambient = AmbientLight(color=(0.008, 0.008, 0.012))
+    sun = DirectionalLight(direction=(-0.3, -0.8, 0.5), color=(0.40, 0.45, 0.55),
+                           intensity=0.04, enabled=True)
 
     foot_pos = list(camera.position)
     foot_pos[1] -= EYE_HEIGHT    # derive foot from eye
