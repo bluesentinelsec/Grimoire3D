@@ -1,23 +1,28 @@
 """Console Demo — exercises the in-game developer console (issue #33).
 
-Press  ~      to open / close the console.
-Press  Tab    for command completion.
-Press  Up/Down to walk command history.
-Press  Ctrl+R  for reverse history search.
-Press  Ctrl+V  to paste from clipboard.
-Press  PgUp/PgDn to scroll output.
-Press  ESC     (in console) to close it.
-Press  ESC     (outside console) to quit.
+Press  ~           to open / close the console.
+Press  Tab         for command completion (forward).
+Press  Shift+Tab   for command completion (reverse).
+Press  Up/Down     to walk command history.
+Press  Ctrl+R      for reverse history search.
+Press  Cmd+V       (macOS) / Ctrl+V (Win/Linux) to paste from clipboard.
+Press  Cmd+C       (macOS) / Ctrl+C (Win/Linux) to copy selection or input.
+Click+drag         in the input row to select text.
+Press  PgUp/PgDn   to scroll output.
+Press  ESC         (in console) to close it.
+Press  ESC         (outside console) to quit.
 
-Registered demo commands
-------------------------
-  color <name>     — change the background colour (red/green/blue/dark/default)
-  spam [n]         — dump n lines of output to fill the scroll buffer
-  crash            — trigger a handled error (tests error display)
-  graphics         — print the current (mock) graphics settings
-  gamma <val>      — set mock gamma (demonstrates runtime float setting)
-  brightness <val> — set mock brightness
-  enabled <on|off> — disable / re-enable the console itself at runtime
+Registered demo commands (namespaced)
+--------------------------------------
+  gfx.color <name>     — change the background colour (red/green/blue/dark/default)
+  gfx.gamma <val>      — get/set mock gamma
+  gfx.brightness <val> — get/set mock brightness
+  gfx.shadows [on|off] — toggle shadow rendering
+  gfx.fog [on|off]     — toggle fog
+  gfx.graphics         — print all current (mock) graphics settings
+  demo.spam [n]        — dump n lines of output to fill the scroll buffer
+  demo.crash           — trigger a handled error (tests error display)
+  demo.enabled [on|off]— disable / re-enable the console itself at runtime
 """
 
 from __future__ import annotations
@@ -147,19 +152,20 @@ def run() -> None:
     # Registration
     # ------------------------------------------------------------------ #
 
-    console.register_command("color",      cmd_color,      description="color <name> — set background colour")
-    console.register_command("spam",       cmd_spam,       description="spam [n] — flood output with n lines (default 30)")
-    console.register_command("crash",      cmd_crash,      description="crash — trigger a handled runtime error")
-    console.register_command("graphics",   cmd_graphics,   description="graphics — show current (mock) graphics settings")
-    console.register_command("gamma",      cmd_gamma,      description="gamma [val] — get/set output gamma")
-    console.register_command("brightness", cmd_brightness, description="brightness [val] — get/set output brightness")
-    console.register_command("shadows",    cmd_shadows,    description="shadows [on|off] — toggle shadow rendering")
-    console.register_command("fog",        cmd_fog,        description="fog [on|off] — toggle fog")
-    console.register_command("enabled",    cmd_enabled,    description="enabled [on|off] — disable/re-enable the console")
+    console.register_command("gfx.color",      cmd_color,      description="gfx.color <name> — set background colour (red/green/blue/dark/default)")
+    console.register_command("gfx.gamma",      cmd_gamma,      description="gfx.gamma [val] — get/set output gamma")
+    console.register_command("gfx.brightness", cmd_brightness, description="gfx.brightness [val] — get/set output brightness")
+    console.register_command("gfx.shadows",    cmd_shadows,    description="gfx.shadows [on|off] — toggle shadow rendering")
+    console.register_command("gfx.fog",        cmd_fog,        description="gfx.fog [on|off] — toggle fog")
+    console.register_command("gfx.graphics",   cmd_graphics,   description="gfx.graphics — show all current (mock) graphics settings")
+    console.register_command("demo.spam",      cmd_spam,       description="demo.spam [n] — flood output with n lines (default 30)")
+    console.register_command("demo.crash",     cmd_crash,      description="demo.crash — trigger a handled runtime error")
+    console.register_command("demo.enabled",   cmd_enabled,    description="demo.enabled [on|off] — disable/re-enable the console")
 
     # Greet
-    console.print("Grimoire2D In-Game Console  —  type 'help' for a command list.", kind="info")
-    console.print("Press  ~  to toggle.  Tab=complete  ↑↓=history  Ctrl+R=search  PgUp/Dn=scroll", kind="info")
+    console.print("Grimoire2D In-Game Console  —  type 'help' or 'std.help' for commands.", kind="info")
+    console.print("Tab/Shift+Tab=complete  ↑↓=history  Ctrl+R=search  Cmd/Ctrl+C=copy  Cmd/Ctrl+V=paste", kind="info")
+    console.print("Click+drag in the input row to select text.  PgUp/Dn=scroll", kind="info")
 
     # ------------------------------------------------------------------ #
     # Main loop
@@ -202,8 +208,8 @@ def run() -> None:
                       (0.40 * pulse, 0.80 * pulse, 1.00 * pulse, 0.22))
 
         # Instruction text (visible when console is closed)
-        r.draw_text("Press  ~  to open the console",
-                    VW / 2 - 220, VH * 0.72, font_size=28,
+        r.draw_text("Press  ~  to open the console  |  Tab/Shift+Tab=complete  |  Click+drag=select",
+                    VW / 2 - 420, VH * 0.72, font_size=24,
                     color=(0.55, 0.70, 0.90, 0.80))
         r.draw_text(f"bg: {bg_color_name}   gamma: {_mock_settings['gamma']}   "
                     f"brightness: {_mock_settings['brightness']}   "
