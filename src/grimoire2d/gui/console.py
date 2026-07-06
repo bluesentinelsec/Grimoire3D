@@ -36,6 +36,12 @@ Commands are registered under dot-separated namespaces by convention:
   dbg.*   — debug / diagnostic toggles
   game.*  — game-logic commands
 
+Mouse selection
+---------------
+Click and drag in the **input row** or **output area** to select text.
+Cmd+C (macOS) / Ctrl+C (Windows/Linux) copies the selection.
+Cmd+V (macOS) / Ctrl+V (Windows/Linux) pastes into the input row.
+
 Release builds
 --------------
 Pass ``enabled=False`` to the constructor (or set ``console.enabled = False``)
@@ -49,15 +55,79 @@ import collections
 import math
 import platform
 import random
+import warnings
 from dataclasses import dataclass, field
 from typing import Callable, TYPE_CHECKING
 
 import pygame
+import pygame.scrap
 
 if TYPE_CHECKING:
     from grimoire2d.presentation.renderer import Renderer
 
-_IS_MAC = platform.system() == "Darwin"
+_IS_MAC     = platform.system() == "Darwin"
+_IS_WINDOWS = platform.system() == "Windows"
+_IS_LINUX   = platform.system() == "Linux"
+
+
+# ---------------------------------------------------------------------------
+# Clipboard helpers (cross-platform)
+# ---------------------------------------------------------------------------
+
+def _clipboard_set(text: str) -> None:
+    """Write *text* to the system clipboard."""
+    if _IS_MAC:
+        import subprocess
+        try:
+            subprocess.run(["pbcopy"], input=text, text=True, timeout=1, check=True)
+            return
+        except Exception:
+            pass
+    if _IS_LINUX:
+        import subprocess
+        for cmd in (["xclip", "-selection", "clipboard"],
+                    ["xsel", "--clipboard", "--input"],
+                    ["wl-copy"]):
+            try:
+                subprocess.run(cmd, input=text, text=True, timeout=1, check=True)
+                return
+            except Exception:
+                continue
+    # pygame.scrap fallback (works on Windows; also catches macOS/Linux if
+    # the subprocess helpers above failed)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pygame.scrap.put_text(text)
+    except Exception:
+        pass
+
+
+def _clipboard_get() -> str:
+    """Read a string from the system clipboard."""
+    if _IS_MAC:
+        import subprocess
+        try:
+            r = subprocess.run(["pbpaste"], capture_output=True, text=True, timeout=1)
+            return r.stdout
+        except Exception:
+            pass
+    if _IS_LINUX:
+        import subprocess
+        for cmd in (["xclip", "-selection", "clipboard", "-o"],
+                    ["xsel", "--clipboard", "--output"],
+                    ["wl-paste", "--no-newline"]):
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=1, check=True)
+                return r.stdout
+            except Exception:
+                continue
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return pygame.scrap.get_text() or ""
+    except Exception:
+        return ""
 
 
 # ---------------------------------------------------------------------------
@@ -103,36 +173,23 @@ class _Particle:
 # ---------------------------------------------------------------------------
 
 class InGameConsole:
-    """Quake-style slide-down developer console.
-
-    Parameters
-    ----------
-    virtual_width, virtual_height:
-        Virtual coordinate space of the host window.
-    height_frac:
-        Fraction of the virtual height the open console occupies (default 0.45).
-    history_max:
-        Maximum number of commands stored in the history buffer.
-    enabled:
-        When ``False`` the console is completely inert — no events are
-        consumed and ``draw()`` is a no-op.  Suitable for release builds.
-    """
+    """Quake-style slide-down developer console."""
 
     # Visual constants
-    _FONT_SIZE         = 20
-    _LINE_H            = 24       # virtual pixels per output line
-    _PAD_X             = 14
-    _PAD_Y             = 10
-    _CURSOR_RATE       = 0.53     # seconds per blink phase
-    _SLIDE_SPEED       = 10.0     # open-fraction units per second
-    _MAX_PARTICLES     = 60
-    _PARTICLE_SPAWN_RATE = 18     # per second
+    _FONT_SIZE           = 20
+    _LINE_H              = 24
+    _PAD_X               = 14
+    _PAD_Y               = 10
+    _CURSOR_RATE         = 0.53
+    _SLIDE_SPEED         = 10.0
+    _MAX_PARTICLES       = 60
+    _PARTICLE_SPAWN_RATE = 18
 
     # Colour palette (RGBA floats)
-    _BG          = (0.04, 0.04, 0.07, 0.92)
-    _BG_BORDER   = (0.15, 0.55, 0.85, 0.70)
-    _INPUT_BG    = (0.07, 0.07, 0.12, 1.00)
-    _SEL_COLOR   = (0.25, 0.55, 0.90, 0.40)
+    _BG        = (0.04, 0.04, 0.07, 0.92)
+    _BG_BORDER = (0.15, 0.55, 0.85, 0.70)
+    _INPUT_BG  = (0.07, 0.07, 0.12, 1.00)
+    _SEL_COLOR = (0.25, 0.55, 0.90, 0.40)
     _COL = {
         "output": (0.75, 0.85, 0.78, 1.0),
         "input":  (0.55, 0.80, 1.00, 1.0),
@@ -152,31 +209,40 @@ class InGameConsole:
         history_max:  int   = 200,
         enabled:      bool  = True,
     ) -> None:
-        self.enabled       = enabled
-        self._vw           = virtual_width
-        self._vh           = virtual_height
-        self._panel_h      = int(virtual_height * height_frac)
+        self.enabled  = enabled
+        self._vw      = virtual_width
+        self._vh      = virtual_height
+        self._panel_h = int(virtual_height * height_frac)
 
         # Animation
-        self._open        = False
-        self._open_frac   = 0.0    # 0 = closed, 1 = fully open
+        self._open      = False
+        self._open_frac = 0.0
 
         # Input state
-        self._input:      str   = ""
-        self._cursor:     int   = 0    # insertion point within _input
-        self._cursor_t:   float = 0.0
+        self._input:    str   = ""
+        self._cursor:   int   = 0
+        self._cursor_t: float = 0.0
 
-        # Mouse selection
-        self._sel_start:    int | None  = None
-        self._sel_end:      int | None  = None
-        self._dragging:     bool        = False
-        self._last_panel_y: int         = -self._panel_h
-        self._renderer:     "Renderer | None" = None   # cached from draw()
+        # ---- Selection ----
+        # sel_area: which area owns the active selection ("input" | "output" | None)
+        self._sel_area:      str | None             = None
+        # Input row selection (char indices into _input)
+        self._sel_start:     int | None             = None
+        self._sel_end:       int | None             = None
+        # Output area selection ((abs_line_idx, char_idx) pairs)
+        self._out_sel_start: tuple[int, int] | None = None
+        self._out_sel_end:   tuple[int, int] | None = None
+        # Mouse drag tracking
+        self._dragging:      bool = False
+
+        # Cached from draw() so handle_event() can do hit-testing
+        self._renderer:      "Renderer | None" = None
+        self._last_panel_y:  int               = -self._panel_h
 
         # History
         self._history:    collections.deque[str] = collections.deque(maxlen=history_max)
-        self._hist_idx:   int  = -1   # -1 = not navigating
-        self._hist_draft: str  = ""   # saved draft before navigating
+        self._hist_idx:   int = -1
+        self._hist_draft: str = ""
 
         # Reverse search
         self._search_mode:  bool = False
@@ -189,7 +255,7 @@ class InGameConsole:
 
         # Output buffer
         self._lines:  list[_Line] = []
-        self._scroll: int         = 0    # lines scrolled up from the bottom
+        self._scroll: int         = 0
 
         # Particles
         self._particles:   list[_Particle] = []
@@ -212,12 +278,7 @@ class InGameConsole:
         description: str            = "",
         aliases:     list[str] | None = None,
     ) -> None:
-        """Register a console command.
-
-        By convention, names are namespaced: ``gfx.fog``, ``std.echo``, etc.
-        ``handler`` receives a list of string arguments (not including the
-        command name) and may return an optional string to print as output.
-        """
+        """Register a console command (namespaced: ``gfx.fog``, ``std.echo``, …)."""
         cmd = _Command(name=name, handler=handler,
                        description=description, aliases=aliases or [])
         self._commands[name.lower()] = cmd
@@ -254,7 +315,6 @@ class InGameConsole:
         if not self._open:
             return False
 
-        # Mouse events — only consume those that land inside the panel
         if event.type == pygame.MOUSEBUTTONDOWN:
             return self._handle_mousedown(event)
         if event.type == pygame.MOUSEMOTION:
@@ -262,7 +322,6 @@ class InGameConsole:
         if event.type == pygame.MOUSEBUTTONUP:
             return self._handle_mouseup(event)
 
-        # Swallow remaining keyboard events while open
         if event.type in (pygame.KEYUP, pygame.TEXTINPUT):
             return True
         return False
@@ -274,10 +333,9 @@ class InGameConsole:
 
         target = 1.0 if self._open else 0.0
         delta  = self._SLIDE_SPEED * dt
-        if self._open_frac < target:
-            self._open_frac = min(target, self._open_frac + delta)
-        else:
-            self._open_frac = max(target, self._open_frac - delta)
+        self._open_frac = (min(target, self._open_frac + delta)
+                           if self._open_frac < target
+                           else max(target, self._open_frac - delta))
 
         if self._open_frac <= 0.0:
             return
@@ -304,7 +362,7 @@ class InGameConsole:
         if not self.enabled or self._open_frac <= 0.0:
             return
 
-        self._renderer = renderer   # cache for mouse hit-testing
+        self._renderer = renderer
 
         frac    = _ease_out(self._open_frac)
         panel_y = -self._panel_h + int(self._panel_h * frac)
@@ -323,7 +381,7 @@ class InGameConsole:
     def _register_builtins(self) -> None:
         self.register_command(
             "std.help",    self._cmd_help,
-            description="std.help [command] — list commands or show help for one",
+            description="std.help [cmd] — list commands or show help for one",
             aliases=["help"])
         self.register_command(
             "std.clear",   self._cmd_clear,
@@ -348,7 +406,7 @@ class InGameConsole:
                 return cmd.description or f"{cmd.name}: no description"
             return f"Unknown command: {args[0]}"
         lines = sorted(
-            f"  {c.name:<22} {c.description}" for c in self._commands.values()
+            f"  {c.name:<24} {c.description}" for c in self._commands.values()
         )
         return "Commands:\n" + "\n".join(lines)
 
@@ -363,8 +421,7 @@ class InGameConsole:
     def _cmd_history(self, _args: list[str]) -> str | None:
         if not self._history:
             return "(empty)"
-        lines = [f"  {i+1:3}  {cmd}" for i, cmd in enumerate(self._history)]
-        return "\n".join(lines)
+        return "\n".join(f"  {i+1:3}  {cmd}" for i, cmd in enumerate(self._history))
 
     def _cmd_quit(self, _args: list[str]) -> str | None:
         pygame.event.post(pygame.event.Event(pygame.QUIT))
@@ -381,30 +438,24 @@ class InGameConsole:
             self._cancel_search()
 
     # ------------------------------------------------------------------
-    # Mouse helpers
+    # Coordinate helpers
     # ------------------------------------------------------------------
 
     def _phys_to_virt(self, mx: int, my: int) -> tuple[float, float]:
-        """Convert physical window pixel coords to virtual (console) coords."""
+        """Physical window pixel → virtual (console) coordinate."""
         r = self._renderer
         if r is None:
             return float(mx), float(my)
-        vp = r.viewport
-        ph = r._phys[1]
-        # viewport_y is the GL bottom; convert to pygame top-left origin
+        vp       = r.viewport
+        ph       = r._phys[1]
         phys_top = ph - vp.viewport_y - vp.viewport_height
-        vx = (mx - vp.viewport_x) / vp.scale
-        vy = (my - phys_top)       / vp.scale
-        return vx, vy
+        return (mx - vp.viewport_x) / vp.scale, (my - phys_top) / vp.scale
 
-    def _virt_x_to_cursor(self, vx: float) -> int:
-        """Map a virtual x position within the input row to a char index in _input."""
+    def _x_to_char(self, vx: float, text: str, base_x: float) -> int:
+        """Map virtual x to nearest char boundary within *text* starting at *base_x*."""
         r = self._renderer
         if r is None:
             return 0
-        prompt_w, _ = r.measure_text(self._PROMPT, font_size=self._FONT_SIZE)
-        base_x = float(self._PAD_X) + prompt_w
-        text   = self._input
         prev_x = base_x
         for i in range(1, len(text) + 1):
             w, _   = r.measure_text(text[:i], font_size=self._FONT_SIZE)
@@ -414,6 +465,17 @@ class InGameConsole:
             prev_x = char_x
         return len(text)
 
+    def _input_base_x(self) -> float:
+        r = self._renderer
+        if r is None:
+            return float(self._PAD_X) + len(self._PROMPT) * 8
+        pw, _ = r.measure_text(self._PROMPT, font_size=self._FONT_SIZE)
+        return float(self._PAD_X) + pw
+
+    # ------------------------------------------------------------------
+    # Hit-testing helpers
+    # ------------------------------------------------------------------
+
     def _in_console(self, vy: float) -> bool:
         return self._last_panel_y <= vy <= self._last_panel_y + self._panel_h
 
@@ -421,30 +483,69 @@ class InGameConsole:
         iy = self._last_panel_y + self._panel_h - self._LINE_H - self._PAD_Y
         return iy - 4 <= vy <= iy + self._LINE_H + 4
 
+    def _in_output_area(self, vy: float) -> bool:
+        top = self._last_panel_y + self._PAD_Y
+        # Stop before the completions row and input row
+        bot = self._last_panel_y + self._panel_h - self._LINE_H * 2 - self._PAD_Y - 4
+        return top <= vy < bot
+
+    def _vy_to_output_line(self, vy: float) -> int | None:
+        """Return the absolute index into self._lines for the output row at vy, or None."""
+        top   = self._last_panel_y + self._PAD_Y
+        n     = self._visible_line_count()
+        total = len(self._lines)
+        end   = max(0, total - self._scroll)
+        start = max(0, end - n)
+        idx   = int((vy - top) / self._LINE_H)
+        if 0 <= idx < (end - start):
+            return start + idx
+        return None
+
+    # ------------------------------------------------------------------
+    # Selection helpers
+    # ------------------------------------------------------------------
+
     def _sel_range(self) -> tuple[int, int] | None:
-        if self._sel_start is None or self._sel_end is None:
+        """Normalised (start, end) for the input-row selection, or None."""
+        if self._sel_start is None or self._sel_end is None or self._sel_start == self._sel_end:
             return None
         a, b = self._sel_start, self._sel_end
-        if a == b:
-            return None
         return (min(a, b), max(a, b))
 
-    def _clear_selection(self) -> None:
-        self._sel_start = self._sel_end = None
+    def _out_sel_range(self) -> tuple[int, int, int, int] | None:
+        """Normalised (line_a, char_a, line_b, char_b) for the output selection, or None."""
+        if self._out_sel_start is None or self._out_sel_end is None:
+            return None
+        s, e = self._out_sel_start, self._out_sel_end
+        if s == e:
+            return None
+        if s > e:
+            s, e = e, s
+        return (s[0], s[1], e[0], e[1])
 
-    def _delete_selection(self) -> None:
+    def _clear_input_sel(self) -> None:
+        self._sel_start = self._sel_end = None
+        if self._sel_area == "input":
+            self._sel_area = None
+
+    def _clear_output_sel(self) -> None:
+        self._out_sel_start = self._out_sel_end = None
+        if self._sel_area == "output":
+            self._sel_area = None
+
+    def _delete_input_selection(self) -> None:
         sel = self._sel_range()
         if sel is None:
             return
         a, b = sel
         self._input  = self._input[:a] + self._input[b:]
         self._cursor = a
-        self._clear_selection()
+        self._clear_input_sel()
         self._reset_completions()
         self._cancel_search()
 
     # ------------------------------------------------------------------
-    # Mouse event handlers
+    # Mouse handlers
     # ------------------------------------------------------------------
 
     def _handle_mousedown(self, event: pygame.event.Event) -> bool:
@@ -452,23 +553,54 @@ class InGameConsole:
             return False
         vx, vy = self._phys_to_virt(event.pos[0], event.pos[1])
         if not self._in_console(vy):
-            return False   # let game handle clicks outside the panel
+            return False   # click outside panel — let game handle it
+
         if self._in_input_row(vy) and not self._search_mode:
-            idx = self._virt_x_to_cursor(vx)
+            idx = self._x_to_char(vx, self._input, self._input_base_x())
             self._cursor    = idx
             self._sel_start = idx
             self._sel_end   = idx
+            self._sel_area  = "input"
+            self._clear_output_sel()
             self._dragging  = True
             self._cursor_t  = 0.0
-        return True        # swallow all clicks inside panel
+
+        elif self._in_output_area(vy):
+            li = self._vy_to_output_line(vy)
+            if li is not None:
+                ci = self._x_to_char(vx, self._lines[li].text, float(self._PAD_X))
+                self._out_sel_start = (li, ci)
+                self._out_sel_end   = (li, ci)
+                self._sel_area      = "output"
+                self._clear_input_sel()
+                self._dragging = True
+
+        return True   # swallow all clicks inside the panel
 
     def _handle_mousemotion(self, event: pygame.event.Event) -> bool:
         if not self._dragging:
             return False
         vx, vy = self._phys_to_virt(event.pos[0], event.pos[1])
-        idx           = self._virt_x_to_cursor(vx)
-        self._sel_end = idx
-        self._cursor  = idx
+
+        if self._sel_area == "input":
+            idx           = self._x_to_char(vx, self._input, self._input_base_x())
+            self._sel_end = idx
+            self._cursor  = idx
+
+        elif self._sel_area == "output":
+            li = self._vy_to_output_line(vy)
+            if li is None:
+                # Clamp to top or bottom visible line
+                top   = self._last_panel_y + self._PAD_Y
+                n     = self._visible_line_count()
+                total = len(self._lines)
+                end   = max(0, total - self._scroll)
+                start = max(0, end - n)
+                li = start if vy < top else end - 1
+                li = max(start, min(end - 1, li))
+            if 0 <= li < len(self._lines):
+                ci = self._x_to_char(vx, self._lines[li].text, float(self._PAD_X))
+                self._out_sel_end = (li, ci)
         return True
 
     def _handle_mouseup(self, event: pygame.event.Event) -> bool:
@@ -477,7 +609,7 @@ class InGameConsole:
         return False
 
     # ------------------------------------------------------------------
-    # Keyboard event handling
+    # Keyboard handler
     # ------------------------------------------------------------------
 
     def _handle_keydown(self, event: pygame.event.Event) -> bool:
@@ -487,7 +619,7 @@ class InGameConsole:
         meta  = bool(mod & pygame.KMOD_META)   # Cmd on macOS
         shift = bool(mod & pygame.KMOD_SHIFT)
 
-        # Clipboard modifier: Cmd on Mac, Ctrl on Windows/Linux
+        # Clipboard modifier: Cmd on macOS, Ctrl on Windows/Linux
         clip_mod = meta if _IS_MAC else ctrl
 
         # --- Ctrl combos (readline) ---
@@ -497,25 +629,25 @@ class InGameConsole:
                 return True
             if key == pygame.K_a:
                 self._cursor = 0
-                self._clear_selection()
+                self._clear_input_sel()
                 return True
             if key == pygame.K_u:
                 self._input  = self._input[self._cursor:]
                 self._cursor = 0
-                self._clear_selection(); self._cancel_search(); self._reset_completions()
+                self._clear_input_sel(); self._cancel_search(); self._reset_completions()
                 return True
             if key == pygame.K_k:
                 self._input = self._input[:self._cursor]
-                self._clear_selection(); self._cancel_search(); self._reset_completions()
+                self._clear_input_sel(); self._cancel_search(); self._reset_completions()
                 return True
 
-        # --- Clipboard (Cmd on Mac, Ctrl on Win/Linux) ---
+        # --- Clipboard ---
         if clip_mod:
             if key == pygame.K_c:
-                self._clipboard_copy()
+                self._do_copy()
                 return True
             if key == pygame.K_v:
-                self._clipboard_paste()
+                self._do_paste()
                 return True
 
         # --- ESC ---
@@ -542,19 +674,19 @@ class InGameConsole:
         # --- Cursor movement ---
         if key == pygame.K_LEFT:
             self._cursor = max(0, self._cursor - 1)
-            self._clear_selection(); self._reset_completions()
+            self._clear_input_sel(); self._reset_completions()
             return True
         if key == pygame.K_RIGHT:
             self._cursor = min(len(self._input), self._cursor + 1)
-            self._clear_selection(); self._reset_completions()
+            self._clear_input_sel(); self._reset_completions()
             return True
         if key == pygame.K_HOME:
             self._cursor = 0
-            self._clear_selection()
+            self._clear_input_sel()
             return True
         if key == pygame.K_END:
             self._cursor = len(self._input)
-            self._clear_selection()
+            self._clear_input_sel()
             return True
 
         # --- Tab completion (Shift+Tab reverses) ---
@@ -576,15 +708,16 @@ class InGameConsole:
                 self._search_query = self._search_query[:-1]
                 self._do_search(reverse=False)
             elif self._sel_range() is not None:
-                self._delete_selection()
+                self._delete_input_selection()
             elif self._cursor > 0:
                 self._input  = self._input[:self._cursor-1] + self._input[self._cursor:]
                 self._cursor -= 1
                 self._reset_completions()
             return True
+
         if key == pygame.K_DELETE:
             if self._sel_range() is not None:
-                self._delete_selection()
+                self._delete_input_selection()
             elif self._cursor < len(self._input):
                 self._input = self._input[:self._cursor] + self._input[self._cursor+1:]
                 self._reset_completions()
@@ -602,7 +735,7 @@ class InGameConsole:
                     a, b = sel
                     self._input  = self._input[:a] + char + self._input[b:]
                     self._cursor = a + 1
-                    self._clear_selection()
+                    self._clear_input_sel()
                 else:
                     self._input  = self._input[:self._cursor] + char + self._input[self._cursor:]
                     self._cursor += 1
@@ -611,6 +744,52 @@ class InGameConsole:
             return True
 
         return True   # swallow all unhandled keys while open
+
+    # ------------------------------------------------------------------
+    # Clipboard operations
+    # ------------------------------------------------------------------
+
+    def _do_copy(self) -> None:
+        """Copy selected text (output or input) to the system clipboard."""
+        if self._sel_area == "output":
+            sel = self._out_sel_range()
+            if sel is None:
+                return
+            sl, sc, el, ec = sel
+            parts: list[str] = []
+            for i in range(sl, el + 1):
+                text = self._lines[i].text
+                if sl == el:
+                    parts.append(text[sc:ec])
+                elif i == sl:
+                    parts.append(text[sc:])
+                elif i == el:
+                    parts.append(text[:ec])
+                else:
+                    parts.append(text)
+            _clipboard_set("\n".join(parts))
+        else:
+            # Input area: copy selection or full line
+            sel  = self._sel_range()
+            text = self._input[sel[0]:sel[1]] if sel else self._input
+            _clipboard_set(text)
+
+    def _do_paste(self) -> None:
+        """Paste from the system clipboard into the input row."""
+        text = "".join(c for c in _clipboard_get() if c.isprintable())
+        if not text:
+            return
+        sel = self._sel_range()
+        if sel is not None:
+            a, b = sel
+            self._input  = self._input[:a] + text + self._input[b:]
+            self._cursor = a + len(text)
+            self._clear_input_sel()
+        else:
+            self._input  = self._input[:self._cursor] + text + self._input[self._cursor:]
+            self._cursor += len(text)
+        self._hist_idx = -1
+        self._reset_completions()
 
     # ------------------------------------------------------------------
     # Input submission
@@ -629,7 +808,7 @@ class InGameConsole:
         self._input  = ""
         self._cursor = 0
         self._hist_idx = -1
-        self._clear_selection()
+        self._clear_input_sel()
         self._reset_completions()
 
         if not cmd:
@@ -664,7 +843,7 @@ class InGameConsole:
 
     def _history_back(self) -> None:
         self._cancel_search()
-        self._clear_selection()
+        self._clear_input_sel()
         if not self._history:
             return
         if self._hist_idx == -1:
@@ -677,7 +856,7 @@ class InGameConsole:
         self._reset_completions()
 
     def _history_forward(self) -> None:
-        self._clear_selection()
+        self._clear_input_sel()
         if self._hist_idx == -1:
             return
         self._hist_idx += 1
@@ -728,16 +907,11 @@ class InGameConsole:
         prefix = token[-1].lower() if token else ""
 
         if self._completions and self._completion_idx >= 0:
-            # Already cycling — step forward or backward
             delta = -1 if reverse else +1
             self._completion_idx = (self._completion_idx + delta) % len(self._completions)
             chosen = self._completions[self._completion_idx]
         else:
-            # Fresh completion
-            candidates = sorted(
-                name for name in self._commands
-                if name.startswith(prefix)
-            )
+            candidates = sorted(n for n in self._commands if n.startswith(prefix))
             if not candidates:
                 return
             self._completions    = candidates
@@ -767,38 +941,6 @@ class InGameConsole:
         return max(1, usable // self._LINE_H)
 
     # ------------------------------------------------------------------
-    # Clipboard
-    # ------------------------------------------------------------------
-
-    def _clipboard_copy(self) -> None:
-        sel  = self._sel_range()
-        text = self._input[sel[0]:sel[1]] if sel else self._input
-        try:
-            pygame.display.set_clipboard(text)
-        except Exception:
-            pass
-
-    def _clipboard_paste(self) -> None:
-        try:
-            text = pygame.display.get_clipboard() or ""
-        except Exception:
-            text = ""
-        text = "".join(c for c in text if c.isprintable())
-        if not text:
-            return
-        sel = self._sel_range()
-        if sel is not None:
-            a, b = sel
-            self._input  = self._input[:a] + text + self._input[b:]
-            self._cursor = a + len(text)
-            self._clear_selection()
-        else:
-            self._input  = self._input[:self._cursor] + text + self._input[self._cursor:]
-            self._cursor += len(text)
-        self._hist_idx = -1
-        self._reset_completions()
-
-    # ------------------------------------------------------------------
     # Particles
     # ------------------------------------------------------------------
 
@@ -822,21 +964,14 @@ class InGameConsole:
 
     def _draw_background(self, r: "Renderer", panel_y: int) -> None:
         r.draw_rect(0, panel_y, self._vw, self._panel_h, self._BG)
-        border_h = 3
-        r.draw_rect(0, panel_y + self._panel_h - border_h,
-                    self._vw, border_h, self._BG_BORDER)
+        r.draw_rect(0, panel_y + self._panel_h - 3, self._vw, 3, self._BG_BORDER)
 
     def _draw_particles(self, r: "Renderer", panel_y: int) -> None:
         for p in self._particles:
             t = p.life / p.max_life
-            if t > 0.85:
-                alpha = (1.0 - t) / 0.15
-            elif t < 0.40:
-                alpha = t / 0.40
-            else:
-                alpha = 1.0
-            alpha *= 0.55
-
+            alpha = ((1.0 - t) / 0.15 if t > 0.85
+                     else t / 0.40    if t < 0.40
+                     else 1.0) * 0.55
             rc = 0.10 + p.hue * 0.40
             gc = 0.94 - p.hue * 0.60
             bc = min(1.0, 0.78 + p.hue * 0.38)
@@ -847,31 +982,49 @@ class InGameConsole:
         total = len(self._lines)
         end   = max(0, total - self._scroll)
         start = max(0, end - n)
-        y     = panel_y + self._PAD_Y
-        for line in self._lines[start:end]:
-            col = self._COL.get(line.kind, self._COL["output"])
-            r.draw_text(line.text, self._PAD_X, y,
-                        font_size=self._FONT_SIZE, color=col)
+
+        out_sel = self._out_sel_range()   # (sl, sc, el, ec) or None
+
+        y = panel_y + self._PAD_Y
+        for rel, line in enumerate(self._lines[start:end]):
+            abs_idx = start + rel
+            col     = self._COL.get(line.kind, self._COL["output"])
+
+            # Selection highlight
+            if out_sel is not None:
+                sl, sc, el, ec = out_sel
+                if sl <= abs_idx <= el:
+                    c_start = sc if abs_idx == sl else 0
+                    c_end   = ec if abs_idx == el else len(line.text)
+                    if c_start < c_end or (c_start == 0 and c_end == 0 and sl < abs_idx < el):
+                        x0, _ = r.measure_text(line.text[:c_start], font_size=self._FONT_SIZE)
+                        x1, _ = r.measure_text(line.text[:c_end],   font_size=self._FONT_SIZE)
+                        # For fully-spanned middle lines select the full visible width
+                        if sl < abs_idx < el:
+                            x1, _ = r.measure_text(line.text, font_size=self._FONT_SIZE)
+                        r.draw_rect(self._PAD_X + x0, y,
+                                    max(6.0, x1 - x0), self._LINE_H - 2,
+                                    self._SEL_COLOR)
+
+            r.draw_text(line.text, self._PAD_X, y, font_size=self._FONT_SIZE, color=col)
             y += self._LINE_H
 
     def _draw_input(self, r: "Renderer", panel_y: int) -> None:
         input_y = panel_y + self._panel_h - self._LINE_H - self._PAD_Y
-        input_h = self._LINE_H + 4
 
-        r.draw_rect(0, input_y - 2, self._vw, input_h, self._INPUT_BG)
+        r.draw_rect(0, input_y - 2, self._vw, self._LINE_H + 4, self._INPUT_BG)
 
         if self._search_mode:
-            found        = self._search_result()
-            display_text = found or ""
+            display_text = self._search_result() or ""
             prompt       = self._SEARCH_PROMPT.format(query=self._search_query)
         else:
             display_text = self._input
             prompt       = self._PROMPT
 
-        # Selection highlight (before text so text renders on top)
+        # Input selection highlight
         sel = self._sel_range()
         if sel is not None and not self._search_mode:
-            a, b = sel
+            a, b  = sel
             pw, _ = r.measure_text(prompt, font_size=self._FONT_SIZE)
             x0, _ = r.measure_text(display_text[:a], font_size=self._FONT_SIZE)
             x1, _ = r.measure_text(display_text[:b], font_size=self._FONT_SIZE)
@@ -886,8 +1039,7 @@ class InGameConsole:
             ci  = self._cursor if not self._search_mode else len(display_text)
             pre = prompt + display_text[:ci]
             cx, _ = r.measure_text(pre, font_size=self._FONT_SIZE)
-            r.draw_rect(self._PAD_X + cx, input_y,
-                        2, self._LINE_H - 2, self._CURSOR_COL)
+            r.draw_rect(self._PAD_X + cx, input_y, 2, self._LINE_H - 2, self._CURSOR_COL)
 
     def _draw_completions(self, r: "Renderer", panel_y: int) -> None:
         if len(self._completions) <= 1:
@@ -907,6 +1059,5 @@ class InGameConsole:
 # ---------------------------------------------------------------------------
 
 def _ease_out(t: float) -> float:
-    """Cubic ease-out: fast open, gentle finish."""
     t = max(0.0, min(1.0, t))
     return 1.0 - (1.0 - t) ** 3
