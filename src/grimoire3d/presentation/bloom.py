@@ -48,7 +48,6 @@ class BloomPass:
         # Texture unit assignments
         self._bright_prog["u_scene"].value = 0
         self._blur_prog["u_input"].value = 0
-        self._composite_prog["u_scene"].value = 0
         self._composite_prog["u_bloom"].value = 1
 
         # Empty VAOs (covering triangle uses gl_VertexID)
@@ -135,13 +134,18 @@ class BloomPass:
             self._blur_prog["u_direction"].value = (0.0, 1.0 / h)
             self._blur_vao.render(moderngl.TRIANGLES, vertices=3)
 
-        # Step 3: Composite bloom onto scene (additive)
+        # Step 3: Composite bloom onto scene (additive blending)
+        # Use GL blending to add bloom on top of the existing scene content
+        # in the FBO, avoiding the read-write feedback loop of sampling
+        # scene_color while rendering to scene_fbo.
         scene_fbo.use()
         self._ctx.viewport = (0, 0, scene_width, scene_height)
-        scene_color.use(0)
+        self._ctx.enable(moderngl.BLEND)
+        self._ctx.blend_func = moderngl.ONE, moderngl.ONE
         self._bloom_tex.use(1)
         self._composite_prog["u_intensity"].value = float(s.bloom_intensity)
         self._composite_vao.render(moderngl.TRIANGLES, vertices=3)
+        self._ctx.disable(moderngl.BLEND)
 
     def release(self) -> None:
         """Release all GPU resources owned by this pass."""

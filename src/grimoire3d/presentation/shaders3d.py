@@ -469,17 +469,16 @@ BLOOM_COMPOSITE_FRAG = """
 
 in vec2 v_uv;
 
-uniform sampler2D u_scene;      // original scene color (texture unit 0)
 uniform sampler2D u_bloom;      // blurred bloom buffer (texture unit 1)
 uniform float     u_intensity;  // bloom strength multiplier
 
 out vec4 frag_color;
 
 void main() {
-    vec3 scene_color = texture(u_scene, v_uv).rgb;
     vec3 bloom_color = texture(u_bloom, v_uv).rgb;
 
-    // Additive bloom composite
-    frag_color = vec4(scene_color + bloom_color * u_intensity, 1.0);
+    // Output bloom contribution only; GL additive blending (ONE, ONE)
+    // composites this onto the existing scene in the framebuffer.
+    frag_color = vec4(bloom_color * u_intensity, 1.0);
 }
 """

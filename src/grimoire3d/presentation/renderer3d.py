@@ -46,15 +46,24 @@ import moderngl
 
 from grimoire3d.assets.obj_loader import ObjMesh, SubMeshData, MtlMaterial, load_obj
 from grimoire3d.models.light3d import (
-    AmbientLight, DirectionalLight, PointLight, SpotLight, SkyGradient,
+    AmbientLight,
+    DirectionalLight,
+    PointLight,
+    SpotLight,
+    SkyGradient,
 )
 from grimoire3d.models.render_settings_3d import RenderSettings3D
 from grimoire3d.presentation.shaders3d import (
-    PHONG_VERT, PHONG_FRAG,
-    WIRE_VERT, WIRE_FRAG,
-    SHADOW_VERT, SHADOW_FRAG,
-    SKY_VERT, SKY_FRAG,
-    BLIT_VERT, BLIT_FRAG,
+    PHONG_VERT,
+    PHONG_FRAG,
+    WIRE_VERT,
+    WIRE_FRAG,
+    SHADOW_VERT,
+    SHADOW_FRAG,
+    SKY_VERT,
+    SKY_FRAG,
+    BLIT_VERT,
+    BLIT_FRAG,
 )
 from grimoire3d.presentation.bloom import BloomPass
 
@@ -67,14 +76,16 @@ if TYPE_CHECKING:
 # GPU mesh types (OBJ-loaded meshes)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class _GpuSubMesh:
     """One GPU draw call — geometry + material for a single OBJ submesh."""
-    vao_solid:  moderngl.VertexArray
+
+    vao_solid: moderngl.VertexArray
     vao_shadow: moderngl.VertexArray
-    texture:    moderngl.Texture | None   # None = use material color
-    color:      tuple[float, float, float, float]
-    shininess:  float
+    texture: moderngl.Texture | None  # None = use material color
+    color: tuple[float, float, float, float]
+    shininess: float
 
 
 class GpuMesh3D:
@@ -82,14 +93,16 @@ class GpuMesh3D:
 
     Pass to ``Renderer3D.draw_mesh()`` each frame.  Do not construct directly.
     """
+
     def __init__(self, submeshes: list[_GpuSubMesh], name: str = "") -> None:
         self.submeshes = submeshes
-        self.name      = name
+        self.name = name
 
 
 # ---------------------------------------------------------------------------
 # Internal primitive mesh container
 # ---------------------------------------------------------------------------
+
 
 class _GpuMesh:
     """Compiled vertex/index buffers for one primitive, bound to all programs."""
@@ -140,24 +153,58 @@ class _GpuMesh:
 # Primitive geometry builders  (pure Python, no GL)
 # ---------------------------------------------------------------------------
 
+
 def _build_box_solid() -> tuple[list[float], list[int]]:
     """Unit box [-0.5, 0.5] on all axes. Per-face normals, 24 vertices."""
     h = 0.5
     face_data = [
-        ((1, 0, 0),  [(h, h,-h,0,1),(h,-h,-h,0,0),(h,-h, h,1,0),(h, h, h,1,1)]),
-        ((-1,0, 0),  [(-h, h, h,0,1),(-h,-h, h,0,0),(-h,-h,-h,1,0),(-h, h,-h,1,1)]),
-        ((0, 1, 0),  [(-h,h,-h,0,0),(-h,h, h,0,1),(h,h, h,1,1),(h,h,-h,1,0)]),
-        ((0,-1, 0),  [(-h,-h, h,0,0),(-h,-h,-h,0,1),(h,-h,-h,1,1),(h,-h, h,1,0)]),
-        ((0, 0, 1),  [(-h, h, h,0,1),(-h,-h, h,0,0),(h,-h, h,1,0),(h, h, h,1,1)]),
-        ((0, 0,-1),  [(h, h,-h,0,1),(h,-h,-h,0,0),(-h,-h,-h,1,0),(-h, h,-h,1,1)]),
+        (
+            (1, 0, 0),
+            [(h, h, -h, 0, 1), (h, -h, -h, 0, 0), (h, -h, h, 1, 0), (h, h, h, 1, 1)],
+        ),
+        (
+            (-1, 0, 0),
+            [
+                (-h, h, h, 0, 1),
+                (-h, -h, h, 0, 0),
+                (-h, -h, -h, 1, 0),
+                (-h, h, -h, 1, 1),
+            ],
+        ),
+        (
+            (0, 1, 0),
+            [(-h, h, -h, 0, 0), (-h, h, h, 0, 1), (h, h, h, 1, 1), (h, h, -h, 1, 0)],
+        ),
+        (
+            (0, -1, 0),
+            [
+                (-h, -h, h, 0, 0),
+                (-h, -h, -h, 0, 1),
+                (h, -h, -h, 1, 1),
+                (h, -h, h, 1, 0),
+            ],
+        ),
+        (
+            (0, 0, 1),
+            [(-h, h, h, 0, 1), (-h, -h, h, 0, 0), (h, -h, h, 1, 0), (h, h, h, 1, 1)],
+        ),
+        (
+            (0, 0, -1),
+            [
+                (h, h, -h, 0, 1),
+                (h, -h, -h, 0, 0),
+                (-h, -h, -h, 1, 0),
+                (-h, h, -h, 1, 1),
+            ],
+        ),
     ]
     verts: list[float] = []
     indices: list[int] = []
     vi = 0
     for (nx, ny, nz), corners in face_data:
-        for (x, y, z, u, v) in corners:
+        for x, y, z, u, v in corners:
             verts += [x, y, z, nx, ny, nz, u, v]
-        indices += [vi, vi+1, vi+2, vi, vi+2, vi+3]
+        indices += [vi, vi + 1, vi + 2, vi, vi + 2, vi + 3]
         vi += 4
     return verts, indices
 
@@ -166,19 +213,48 @@ def _build_box_wire() -> tuple[list[float], list[int]]:
     """8-corner wireframe box. Positions only."""
     h = 0.5
     corners = [
-        [-h,-h,-h], [ h,-h,-h], [ h, h,-h], [-h, h,-h],
-        [-h,-h, h], [ h,-h, h], [ h, h, h], [-h, h, h],
+        [-h, -h, -h],
+        [h, -h, -h],
+        [h, h, -h],
+        [-h, h, -h],
+        [-h, -h, h],
+        [h, -h, h],
+        [h, h, h],
+        [-h, h, h],
     ]
     verts = [v for c in corners for v in c]
     lines = [
-        0,1, 1,2, 2,3, 3,0,
-        4,5, 5,6, 6,7, 7,4,
-        0,4, 1,5, 2,6, 3,7,
+        0,
+        1,
+        1,
+        2,
+        2,
+        3,
+        3,
+        0,
+        4,
+        5,
+        5,
+        6,
+        6,
+        7,
+        7,
+        4,
+        0,
+        4,
+        1,
+        5,
+        2,
+        6,
+        3,
+        7,
     ]
     return verts, lines
 
 
-def _build_sphere_solid(stacks: int = 24, slices: int = 24) -> tuple[list[float], list[int]]:
+def _build_sphere_solid(
+    stacks: int = 24, slices: int = 24
+) -> tuple[list[float], list[int]]:
     """UV sphere, radius 1. Normals == position (unit sphere)."""
     verts: list[float] = []
     indices: list[int] = []
@@ -223,10 +299,30 @@ def _build_plane_solid() -> tuple[list[float], list[int]]:
     """Unit XZ plane (Y=0). Normal points +Y."""
     n = [0.0, 1.0, 0.0]
     verts = [
-        -0.5, 0.0, -0.5,  *n, 0.0, 0.0,
-         0.5, 0.0, -0.5,  *n, 1.0, 0.0,
-         0.5, 0.0,  0.5,  *n, 1.0, 1.0,
-        -0.5, 0.0,  0.5,  *n, 0.0, 1.0,
+        -0.5,
+        0.0,
+        -0.5,
+        *n,
+        0.0,
+        0.0,
+        0.5,
+        0.0,
+        -0.5,
+        *n,
+        1.0,
+        0.0,
+        0.5,
+        0.0,
+        0.5,
+        *n,
+        1.0,
+        1.0,
+        -0.5,
+        0.0,
+        0.5,
+        *n,
+        0.0,
+        1.0,
     ]
     return verts, [0, 1, 2, 0, 2, 3]
 
@@ -245,32 +341,36 @@ def _build_cylinder_solid(slices: int = 24) -> tuple[list[float], list[int]]:
         c0, s0 = math.cos(a0), math.sin(a0)
         c1, s1 = math.cos(a1), math.sin(a1)
         u0, u1 = sl / slices, (sl + 1) / slices
-        verts += [R*c0, -H, R*s0,  c0, 0, s0,  u0, 0]
-        verts += [R*c1, -H, R*s1,  c1, 0, s1,  u1, 0]
-        verts += [R*c1,  H, R*s1,  c1, 0, s1,  u1, 1]
-        verts += [R*c0,  H, R*s0,  c0, 0, s0,  u0, 1]
-        indices += [vi, vi+1, vi+2, vi, vi+2, vi+3]
+        verts += [R * c0, -H, R * s0, c0, 0, s0, u0, 0]
+        verts += [R * c1, -H, R * s1, c1, 0, s1, u1, 0]
+        verts += [R * c1, H, R * s1, c1, 0, s1, u1, 1]
+        verts += [R * c0, H, R * s0, c0, 0, s0, u0, 1]
+        indices += [vi, vi + 1, vi + 2, vi, vi + 2, vi + 3]
         vi += 4
 
     # Top cap (y=H)
     tc = vi
-    verts += [0, H, 0,  0, 1, 0,  0.5, 0.5]; vi += 1
+    verts += [0, H, 0, 0, 1, 0, 0.5, 0.5]
+    vi += 1
     tb = vi
     for sl in range(slices):
         a = 2 * math.pi * sl / slices
         c, s = math.cos(a), math.sin(a)
-        verts += [R*c, H, R*s,  0, 1, 0,  0.5+0.5*c, 0.5+0.5*s]; vi += 1
+        verts += [R * c, H, R * s, 0, 1, 0, 0.5 + 0.5 * c, 0.5 + 0.5 * s]
+        vi += 1
     for sl in range(slices):
         indices += [tc, tb + sl, tb + (sl + 1) % slices]
 
     # Bottom cap (y=-H), reversed winding
     bc = vi
-    verts += [0, -H, 0,  0, -1, 0,  0.5, 0.5]; vi += 1
+    verts += [0, -H, 0, 0, -1, 0, 0.5, 0.5]
+    vi += 1
     bb = vi
     for sl in range(slices):
         a = 2 * math.pi * sl / slices
         c, s = math.cos(a), math.sin(a)
-        verts += [R*c, -H, R*s,  0, -1, 0,  0.5+0.5*c, 0.5+0.5*s]; vi += 1
+        verts += [R * c, -H, R * s, 0, -1, 0, 0.5 + 0.5 * c, 0.5 + 0.5 * s]
+        vi += 1
     for sl in range(slices):
         indices += [bc, bb + (sl + 1) % slices, bb + sl]
 
@@ -314,8 +414,8 @@ def _build_cone_solid(slices: int = 24) -> tuple[list[float], list[int]]:
     R = 0.5
     # Slant normal: horizontal component = h/slant, y = r/slant
     slant = math.sqrt(R * R + 1.0)
-    ny_s  = R / slant
-    nr_s  = 1.0 / slant
+    ny_s = R / slant
+    nr_s = 1.0 / slant
 
     # Side triangles: tip + two base vertices per slice
     for sl in range(slices):
@@ -327,20 +427,22 @@ def _build_cone_solid(slices: int = 24) -> tuple[list[float], list[int]]:
         cm, sm = math.cos(am), math.sin(am)
         u0, u1 = sl / slices, (sl + 1) / slices
         # Tip (averaged normal for the slice)
-        verts += [0, 0.5, 0,  nr_s*cm, ny_s, nr_s*sm,  (u0+u1)/2, 1.0]
-        verts += [R*c0, -0.5, R*s0,  nr_s*c0, ny_s, nr_s*s0,  u0, 0.0]
-        verts += [R*c1, -0.5, R*s1,  nr_s*c1, ny_s, nr_s*s1,  u1, 0.0]
-        indices += [vi, vi+1, vi+2]
+        verts += [0, 0.5, 0, nr_s * cm, ny_s, nr_s * sm, (u0 + u1) / 2, 1.0]
+        verts += [R * c0, -0.5, R * s0, nr_s * c0, ny_s, nr_s * s0, u0, 0.0]
+        verts += [R * c1, -0.5, R * s1, nr_s * c1, ny_s, nr_s * s1, u1, 0.0]
+        indices += [vi, vi + 1, vi + 2]
         vi += 3
 
     # Base cap (y=-0.5)
     bc = vi
-    verts += [0, -0.5, 0,  0, -1, 0,  0.5, 0.5]; vi += 1
+    verts += [0, -0.5, 0, 0, -1, 0, 0.5, 0.5]
+    vi += 1
     bb = vi
     for sl in range(slices):
         a = 2 * math.pi * sl / slices
         c, s = math.cos(a), math.sin(a)
-        verts += [R*c, -0.5, R*s,  0, -1, 0,  0.5+0.5*c, 0.5+0.5*s]; vi += 1
+        verts += [R * c, -0.5, R * s, 0, -1, 0, 0.5 + 0.5 * c, 0.5 + 0.5 * s]
+        vi += 1
     for sl in range(slices):
         indices += [bc, bb + (sl + 1) % slices, bb + sl]
 
@@ -369,13 +471,15 @@ def _build_cone_wire(slices: int = 24) -> tuple[list[float], list[int]]:
     return verts, lines
 
 
-def _build_capsule_solid(hemi_stacks: int = 8, slices: int = 24) -> tuple[list[float], list[int]]:
+def _build_capsule_solid(
+    hemi_stacks: int = 8, slices: int = 24
+) -> tuple[list[float], list[int]]:
     """Capsule: cylinder radius=0.5, cylinder height=1.0, hemispherical caps radius=0.5.
     Total height=2.0, center at origin."""
     verts: list[float] = []
     indices: list[int] = []
     vi = 0
-    R  = 0.5
+    R = 0.5
     CY = 0.5  # half cylinder height; caps attach at y=±CY
 
     def add_hemi_band(phi0: float, phi1: float, cy: float, flip: bool) -> None:
@@ -391,14 +495,24 @@ def _build_capsule_solid(hemi_stacks: int = 8, slices: int = 24) -> tuple[list[f
                 nz = math.sin(phi) * math.sin(theta)
                 if flip:
                     ny = -ny
-                verts.extend([R*nx, cy + R*(math.cos(phi) if not flip else -math.cos(phi)),
-                               R*nz, nx, ny, nz, sl/slices, phi/math.pi])
+                verts.extend(
+                    [
+                        R * nx,
+                        cy + R * (math.cos(phi) if not flip else -math.cos(phi)),
+                        R * nz,
+                        nx,
+                        ny,
+                        nz,
+                        sl / slices,
+                        phi / math.pi,
+                    ]
+                )
                 vi += 1
             rows.append(list(range(row_start, vi)))
         top_row, bot_row = rows[0], rows[1]
         for sl in range(slices):
-            i0, i1 = top_row[sl],   top_row[sl+1]
-            i2, i3 = bot_row[sl],   bot_row[sl+1]
+            i0, i1 = top_row[sl], top_row[sl + 1]
+            i2, i3 = bot_row[sl], bot_row[sl + 1]
             indices.extend([i0, i2, i1, i1, i2, i3])
 
     n_hemi = hemi_stacks
@@ -416,11 +530,11 @@ def _build_capsule_solid(hemi_stacks: int = 8, slices: int = 24) -> tuple[list[f
         c0, s0 = math.cos(a0), math.sin(a0)
         c1, s1 = math.cos(a1), math.sin(a1)
         u0, u1 = sl / slices, (sl + 1) / slices
-        verts += [R*c0, -CY, R*s0,  c0, 0, s0,  u0, 0]
-        verts += [R*c1, -CY, R*s1,  c1, 0, s1,  u1, 0]
-        verts += [R*c1,  CY, R*s1,  c1, 0, s1,  u1, 1]
-        verts += [R*c0,  CY, R*s0,  c0, 0, s0,  u0, 1]
-        indices += [vi, vi+1, vi+2, vi, vi+2, vi+3]
+        verts += [R * c0, -CY, R * s0, c0, 0, s0, u0, 0]
+        verts += [R * c1, -CY, R * s1, c1, 0, s1, u1, 0]
+        verts += [R * c1, CY, R * s1, c1, 0, s1, u1, 1]
+        verts += [R * c0, CY, R * s0, c0, 0, s0, u0, 1]
+        indices += [vi, vi + 1, vi + 2, vi, vi + 2, vi + 3]
         vi += 4
 
     # Bottom hemisphere: phi 0→π/2, center at y=-CY, flipped
@@ -436,7 +550,7 @@ def _build_capsule_wire(slices: int = 24) -> tuple[list[float], list[int]]:
     """Top/bottom hemi arcs + equator rings + vertical connectors. Positions only."""
     verts: list[float] = []
     lines: list[int] = []
-    R  = 0.5
+    R = 0.5
     CY = 0.5
     SEG = slices
 
@@ -471,6 +585,7 @@ def _build_capsule_wire(slices: int = 24) -> tuple[list[float], list[int]]:
 # ---------------------------------------------------------------------------
 # Uniform helpers
 # ---------------------------------------------------------------------------
+
 
 def _mat4(m: glm.mat4) -> tuple:
     """Flat 16-float tuple in column-major order for a moderngl mat4 uniform.
@@ -511,8 +626,8 @@ class LightCuller:
     returned at full intensity without any state tracking.
     """
 
-    FADE_IN_RATE  = 8.0   # weight gained per second (0 → 1 in ~0.12 s)
-    FADE_OUT_RATE = 3.0   # weight lost  per second  (1 → 0 in ~0.33 s)
+    FADE_IN_RATE = 8.0  # weight gained per second (0 → 1 in ~0.12 s)
+    FADE_OUT_RATE = 3.0  # weight lost  per second  (1 → 0 in ~0.33 s)
 
     def __init__(self, max_n: int) -> None:
         self._max_n = max_n
@@ -522,7 +637,9 @@ class LightCuller:
     @staticmethod
     def _score(light, cam_pos: glm.vec3) -> float:
         px, py, pz = light.position
-        d = math.sqrt((px - cam_pos.x)**2 + (py - cam_pos.y)**2 + (pz - cam_pos.z)**2)
+        d = math.sqrt(
+            (px - cam_pos.x) ** 2 + (py - cam_pos.y) ** 2 + (pz - cam_pos.z) ** 2
+        )
         if d >= light.radius:
             return 0.0
         return light.intensity * (1.0 - d / light.radius) ** 2
@@ -539,7 +656,9 @@ class LightCuller:
         # Score and rank all lights
         scored_pairs = [(l, self._score(l, cam_pos)) for l in lights]
         scored_pairs.sort(key=lambda x: x[1], reverse=True)
-        desired_keys = {tuple(l.position) for l, s in scored_pairs[:self._max_n] if s > 0.0}
+        desired_keys = {
+            tuple(l.position) for l, s in scored_pairs[: self._max_n] if s > 0.0
+        }
         light_by_key = {tuple(l.position): l for l in lights}
 
         # Advance fade weights for already-tracked lights
@@ -548,9 +667,13 @@ class LightCuller:
                 del self._weights[key]
                 continue
             if key in desired_keys:
-                self._weights[key] = min(1.0, self._weights[key] + self.FADE_IN_RATE * dt)
+                self._weights[key] = min(
+                    1.0, self._weights[key] + self.FADE_IN_RATE * dt
+                )
             else:
-                self._weights[key] = max(0.0, self._weights[key] - self.FADE_OUT_RATE * dt)
+                self._weights[key] = max(
+                    0.0, self._weights[key] - self.FADE_OUT_RATE * dt
+                )
 
         # Admit newly desired lights not yet tracked
         for key in desired_keys:
@@ -561,15 +684,20 @@ class LightCuller:
         self._weights = {k: w for k, w in self._weights.items() if w > 1e-4}
 
         # Slot allocation: desired lights first, then fading-out sorted by weight
-        desired_slots = [(k, self._weights[k], light_by_key[k])
-                         for k in desired_keys if k in self._weights]
-        fading_slots  = [(k, self._weights[k], light_by_key[k])
-                         for k in self._weights
-                         if k not in desired_keys and k in light_by_key]
+        desired_slots = [
+            (k, self._weights[k], light_by_key[k])
+            for k in desired_keys
+            if k in self._weights
+        ]
+        fading_slots = [
+            (k, self._weights[k], light_by_key[k])
+            for k in self._weights
+            if k not in desired_keys and k in light_by_key
+        ]
         fading_slots.sort(key=lambda x: x[1], reverse=True)
 
         result = []
-        for _key, w, light in (desired_slots + fading_slots)[:self._max_n]:
+        for _key, w, light in (desired_slots + fading_slots)[: self._max_n]:
             result.append(dataclasses.replace(light, intensity=light.intensity * w))
         return result
 
@@ -577,6 +705,7 @@ class LightCuller:
 # ---------------------------------------------------------------------------
 # Post-processing pipeline
 # ---------------------------------------------------------------------------
+
 
 class _PostProcessPipeline:
     """Intermediate scene FBO + ordered post-processing pass chain.
@@ -603,19 +732,20 @@ class _PostProcessPipeline:
         width: int,
         height: int,
     ) -> None:
-        self._ctx      = ctx
+        self._ctx = ctx
         self._settings = settings
         self._w = self._h = 0
-        self._scene_color: moderngl.Texture | None       = None
-        self._scene_depth: moderngl.Texture | None       = None
-        self._scene_fbo:   moderngl.Framebuffer | None   = None
+        self._scene_color: moderngl.Texture | None = None
+        self._scene_depth: moderngl.Texture | None = None
+        self._scene_fbo: moderngl.Framebuffer | None = None
 
         # Gamma + brightness blit — always the terminal pass
         self._blit_prog = ctx.program(
-            vertex_shader=BLIT_VERT, fragment_shader=BLIT_FRAG,
+            vertex_shader=BLIT_VERT,
+            fragment_shader=BLIT_FRAG,
         )
         self._blit_prog["u_scene"].value = 0
-        self._blit_vao = ctx.vertex_array(self._blit_prog, [])   # no VBO needed
+        self._blit_vao = ctx.vertex_array(self._blit_prog, [])  # no VBO needed
 
         # Bloom pass (half-res iterative Gaussian blur)
         self._bloom_pass = BloomPass(ctx, settings)
@@ -634,10 +764,10 @@ class _PostProcessPipeline:
 
         self._w = width
         self._h = height
-        self._scene_color = self._ctx.texture((width, height), 4, dtype='f2')
+        self._scene_color = self._ctx.texture((width, height), 4, dtype="f2")
         self._scene_color.filter = (moderngl.LINEAR, moderngl.LINEAR)
         self._scene_depth = self._ctx.depth_texture((width, height))
-        self._scene_fbo   = self._ctx.framebuffer(
+        self._scene_fbo = self._ctx.framebuffer(
             color_attachments=[self._scene_color],
             depth_attachment=self._scene_depth,
         )
@@ -686,17 +816,27 @@ class _PostProcessPipeline:
             self._bloom_pass.execute(
                 self._scene_color, self._scene_fbo, self._w, self._h
             )
+            # Bloom pass rebinds internal FBOs; restore screen target.
+            self._ctx.screen.use()
+            self._ctx.viewport = screen_viewport
 
         # Terminal pass: gamma correction + brightness → screen
         self._scene_color.use(0)
         self._blit_prog["u_brightness"].value = float(s.brightness)
-        self._blit_prog["u_gamma"].value      = float(max(s.gamma, 0.01))
+        self._blit_prog["u_gamma"].value = float(max(s.gamma, 0.01))
         self._blit_vao.render(moderngl.TRIANGLES, vertices=3)
+
+        # Restore blend state for subsequent 2D HUD / overlay rendering.
+        # The 2D renderer expects SRC_ALPHA / ONE_MINUS_SRC_ALPHA blending
+        # to be active after the 3D scene pass completes.
+        self._ctx.enable(moderngl.BLEND)
+        self._ctx.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
 
 
 # ---------------------------------------------------------------------------
 # Renderer3D
 # ---------------------------------------------------------------------------
+
 
 class Renderer3D:
     """Hardware-accelerated 3D renderer (forward Phong, OpenGL 3.30 core).
@@ -722,10 +862,12 @@ class Renderer3D:
             sz *= 2
         self._shadow_map_size = sz
 
-        self._phong  = ctx.program(vertex_shader=PHONG_VERT,  fragment_shader=PHONG_FRAG)
-        self._wire   = ctx.program(vertex_shader=WIRE_VERT,   fragment_shader=WIRE_FRAG)
-        self._shadow = ctx.program(vertex_shader=SHADOW_VERT, fragment_shader=SHADOW_FRAG)
-        self._sky    = ctx.program(vertex_shader=SKY_VERT,    fragment_shader=SKY_FRAG)
+        self._phong = ctx.program(vertex_shader=PHONG_VERT, fragment_shader=PHONG_FRAG)
+        self._wire = ctx.program(vertex_shader=WIRE_VERT, fragment_shader=WIRE_FRAG)
+        self._shadow = ctx.program(
+            vertex_shader=SHADOW_VERT, fragment_shader=SHADOW_FRAG
+        )
+        self._sky = ctx.program(vertex_shader=SKY_VERT, fragment_shader=SKY_FRAG)
 
         self._meshes: dict[str, _GpuMesh] = {}
 
@@ -740,7 +882,7 @@ class Renderer3D:
         # Shadow map resources
         sz = self._shadow_map_size
         self._shadow_depth = ctx.depth_texture((sz, sz))
-        self._shadow_fbo   = ctx.framebuffer(depth_attachment=self._shadow_depth)
+        self._shadow_fbo = ctx.framebuffer(depth_attachment=self._shadow_depth)
         self._shadow_depth.use(1)
         self._phong["u_shadow_map"].value = 1
         self._phong["u_shadows_on"].value = False
@@ -754,8 +896,10 @@ class Renderer3D:
         # Dynamic quad: single reusable VBO written each draw_quad() call.
         # Layout: 3f pos | 3f normal | 2f uv — same interleaved stride as all
         # solid meshes (32 bytes / vertex), so the shadow VAO can reuse "3f 20x".
-        _QUAD_IBO_S = array.array("I", [0, 1, 2, 0, 2, 3]).tobytes()   # solid: 2 tris
-        _QUAD_IBO_W = array.array("I", [0, 1, 1, 2, 2, 3, 3, 0]).tobytes()  # wire: 4 edges
+        _QUAD_IBO_S = array.array("I", [0, 1, 2, 0, 2, 3]).tobytes()  # solid: 2 tris
+        _QUAD_IBO_W = array.array(
+            "I", [0, 1, 1, 2, 2, 3, 3, 0]
+        ).tobytes()  # wire: 4 edges
         self._dyn_quad_vbo = ctx.buffer(reserve=4 * 32)
         _dq_ibo_s = ctx.buffer(_QUAD_IBO_S)
         _dq_ibo_w = ctx.buffer(_QUAD_IBO_W)
@@ -813,12 +957,16 @@ class Renderer3D:
         """
         d = glm.normalize(glm.vec3(*dir_light.direction))
         center = glm.vec3(*scene_center)
-        light_pos   = center - d * scene_radius * 2.0
+        light_pos = center - d * scene_radius * 2.0
         # Stable up vector — avoid degenerate lookAt when light points straight up
-        world_up = glm.vec3(0, 1, 0) if abs(glm.dot(d, glm.vec3(0, 1, 0))) < 0.99 else glm.vec3(1, 0, 0)
-        light_view  = glm.lookAt(light_pos, center, world_up)
+        world_up = (
+            glm.vec3(0, 1, 0)
+            if abs(glm.dot(d, glm.vec3(0, 1, 0))) < 0.99
+            else glm.vec3(1, 0, 0)
+        )
+        light_view = glm.lookAt(light_pos, center, world_up)
         r = scene_radius
-        light_proj  = glm.ortho(-r, r, -r, r, 0.1, scene_radius * 4.0)
+        light_proj = glm.ortho(-r, r, -r, r, 0.1, scene_radius * 4.0)
         self._light_space = light_proj * light_view
 
         self._shadow["u_light_view"].value = _mat4(light_view)
@@ -875,7 +1023,7 @@ class Renderer3D:
 
         # Compute scene render resolution (render_scale applied here)
         rs = max(0.1, self.settings.render_scale)
-        scene_w = max(1, round(vp.viewport_width  * rs))
+        scene_w = max(1, round(vp.viewport_width * rs))
         scene_h = max(1, round(vp.viewport_height * rs))
         self._pp.ensure_size(scene_w, scene_h)
 
@@ -899,19 +1047,19 @@ class Renderer3D:
             self.ctx.disable(moderngl.DEPTH_TEST)
             inv_proj = glm.inverse(proj)
             inv_view = glm.inverse(view)
-            self._sky["u_inv_proj"].value  = _mat4(inv_proj)
-            self._sky["u_inv_view"].value  = _mat4(inv_view)
-            self._sky["u_sky_zenith"].value  = sky.zenith_color
+            self._sky["u_inv_proj"].value = _mat4(inv_proj)
+            self._sky["u_inv_view"].value = _mat4(inv_view)
+            self._sky["u_sky_zenith"].value = sky.zenith_color
             self._sky["u_sky_horizon"].value = sky.horizon_color
-            self._sky["u_sky_ground"].value  = sky.ground_color
+            self._sky["u_sky_ground"].value = sky.ground_color
             self._sky_vao.render(moderngl.TRIANGLES, vertices=3)
 
         self.ctx.enable(moderngl.DEPTH_TEST)
         self.ctx.depth_func = "<"
 
         p = self._phong
-        p["u_view"].value    = _mat4(view)
-        p["u_proj"].value    = _mat4(proj)
+        p["u_view"].value = _mat4(view)
+        p["u_proj"].value = _mat4(proj)
         p["u_cam_pos"].value = tuple(camera.position)
 
         amb = ambient or AmbientLight()
@@ -919,8 +1067,8 @@ class Renderer3D:
 
         dl = dir_light or DirectionalLight()
         if dl.enabled:
-            p["u_dir_light_on"].value    = True
-            p["u_dir_light_dir"].value   = dl.direction
+            p["u_dir_light_on"].value = True
+            p["u_dir_light_dir"].value = dl.direction
             p["u_dir_light_color"].value = tuple(c * dl.intensity for c in dl.color)
         else:
             p["u_dir_light_on"].value = False
@@ -928,7 +1076,7 @@ class Renderer3D:
         # Shadow uniforms
         s = self.settings
         if self._light_space is not None and s.shadows:
-            p["u_shadows_on"].value  = True
+            p["u_shadows_on"].value = True
             p["u_light_space"].value = _mat4(self._light_space)
             self._shadow_depth.use(1)
         else:
@@ -937,9 +1085,9 @@ class Renderer3D:
         # --- Point lights: cull to GPU cap, then upload whole-array ---
         # macOS/Metal registers array uniforms under the base name only.
         # All MAX_PL slots are always written so the driver never prunes any.
-        MAX_PL = s.max_point_lights   # GPU cap (default 8)
+        MAX_PL = s.max_point_lights  # GPU cap (default 8)
         all_pl = point_lights or []
-        self.last_point_light_count = len(all_pl)       # total before cull
+        self.last_point_light_count = len(all_pl)  # total before cull
         active_pl = self._pl_culler.update(all_pl, camera.position, dt)
         self.last_point_lights_active = len(active_pl)  # uploaded to GPU
 
@@ -960,15 +1108,15 @@ class Renderer3D:
                 pl_col.append((0.0, 0.0, 0.0))
                 pl_rad.append(1.0)
                 pl_int.append(0.0)
-        _set(p, "u_pl_pos",       tuple(pl_pos))
-        _set(p, "u_pl_color",     tuple(pl_col))
-        _set(p, "u_pl_radius",    tuple(pl_rad))
+        _set(p, "u_pl_pos", tuple(pl_pos))
+        _set(p, "u_pl_color", tuple(pl_col))
+        _set(p, "u_pl_radius", tuple(pl_rad))
         _set(p, "u_pl_intensity", tuple(pl_int))
 
         # --- Spot lights: cull to 4, then upload whole-array ---
         MAX_SL = 4
         all_sl = spot_lights or []
-        self.last_spot_light_count  = len(all_sl)
+        self.last_spot_light_count = len(all_sl)
         active_sl = self._sl_culler.update(all_sl, camera.position, dt)
         self.last_spot_lights_active = len(active_sl)
 
@@ -978,8 +1126,8 @@ class Renderer3D:
         sl_col: list[tuple] = []
         sl_int: list[float] = []
         sl_rad: list[float] = []
-        sl_ic:  list[float] = []
-        sl_oc:  list[float] = []
+        sl_ic: list[float] = []
+        sl_oc: list[float] = []
         for i in range(MAX_SL):
             if i < len(active_sl):
                 sl = active_sl[i]
@@ -998,11 +1146,11 @@ class Renderer3D:
                 sl_rad.append(1.0)
                 sl_ic.append(1.0)
                 sl_oc.append(0.9)
-        _set(p, "u_sl_pos",       tuple(sl_pos))
-        _set(p, "u_sl_dir",       tuple(sl_dir))
-        _set(p, "u_sl_color",     tuple(sl_col))
+        _set(p, "u_sl_pos", tuple(sl_pos))
+        _set(p, "u_sl_dir", tuple(sl_dir))
+        _set(p, "u_sl_color", tuple(sl_col))
         _set(p, "u_sl_intensity", tuple(sl_int))
-        _set(p, "u_sl_radius",    tuple(sl_rad))
+        _set(p, "u_sl_radius", tuple(sl_rad))
         _set(p, "u_sl_inner_cos", tuple(sl_ic))
         _set(p, "u_sl_outer_cos", tuple(sl_oc))
 
@@ -1010,8 +1158,8 @@ class Renderer3D:
         p["u_fog_on"].value = s.fog
         if s.fog:
             p["u_fog_color"].value = s.fog_color
-            p["u_fog_near"].value  = s.fog_near
-            p["u_fog_far"].value   = s.fog_far
+            p["u_fog_near"].value = s.fog_near
+            p["u_fog_far"].value = s.fog_far
 
         # Wire program shares view/proj
         w = self._wire
@@ -1022,8 +1170,12 @@ class Renderer3D:
         """Run the post-processing chain, blit to screen, restore HUD viewport."""
         if self._last_viewport:
             vp = self._last_viewport
-            screen_vp = (vp.viewport_x, vp.viewport_y,
-                         vp.viewport_width, vp.viewport_height)
+            screen_vp = (
+                vp.viewport_x,
+                vp.viewport_y,
+                vp.viewport_width,
+                vp.viewport_height,
+            )
             self._pp.run(screen_vp)
             # Restore viewport and depth state for subsequent 2D HUD drawing
             self.ctx.viewport = screen_vp
@@ -1136,19 +1288,53 @@ class Renderer3D:
 
         The quad writes to the shadow map when called inside a shadow pass.
         """
-        v0 = glm.vec3(*p0); v1 = glm.vec3(*p1)
-        v2 = glm.vec3(*p2); v3 = glm.vec3(*p3)
-        e1 = v1 - v0; e2 = v3 - v0
+        v0 = glm.vec3(*p0)
+        v1 = glm.vec3(*p1)
+        v2 = glm.vec3(*p2)
+        v3 = glm.vec3(*p3)
+        e1 = v1 - v0
+        e2 = v3 - v0
         raw_n = glm.cross(e1, e2)
         n = glm.normalize(raw_n) if glm.length(raw_n) > 1e-9 else glm.vec3(0, 1, 0)
         nx, ny, nz = n.x, n.y, n.z
 
-        verts = array.array("f", [
-            p0[0], p0[1], p0[2],  nx, ny, nz,  0.0, 0.0,
-            p1[0], p1[1], p1[2],  nx, ny, nz,  1.0, 0.0,
-            p2[0], p2[1], p2[2],  nx, ny, nz,  1.0, 1.0,
-            p3[0], p3[1], p3[2],  nx, ny, nz,  0.0, 1.0,
-        ])
+        verts = array.array(
+            "f",
+            [
+                p0[0],
+                p0[1],
+                p0[2],
+                nx,
+                ny,
+                nz,
+                0.0,
+                0.0,
+                p1[0],
+                p1[1],
+                p1[2],
+                nx,
+                ny,
+                nz,
+                1.0,
+                0.0,
+                p2[0],
+                p2[1],
+                p2[2],
+                nx,
+                ny,
+                nz,
+                1.0,
+                1.0,
+                p3[0],
+                p3[1],
+                p3[2],
+                nx,
+                ny,
+                nz,
+                0.0,
+                1.0,
+            ],
+        )
         self._dyn_quad_vbo.write(verts.tobytes())
         identity = _mat4(glm.mat4(1.0))
 
@@ -1162,10 +1348,10 @@ class Renderer3D:
             self._wire["u_color"].value = color
             self._dyn_quad_vao_wire.render(moderngl.LINES)
         else:
-            self._phong["u_model"].value       = identity
-            self._phong["u_model_inv_t"].value  = identity
-            self._phong["u_color"].value        = color
-            self._phong["u_use_texture"].value  = False
+            self._phong["u_model"].value = identity
+            self._phong["u_model_inv_t"].value = identity
+            self._phong["u_color"].value = color
+            self._phong["u_use_texture"].value = False
             self._dyn_quad_vao_solid.render(moderngl.TRIANGLES)
 
     def draw_rect3d(
@@ -1188,7 +1374,7 @@ class Renderer3D:
         u = glm.vec3(*up)
         if abs(glm.dot(n, glm.normalize(u))) > 0.99:
             u = glm.vec3(1, 0, 0) if abs(n.x) < 0.9 else glm.vec3(0, 0, 1)
-        right  = glm.normalize(glm.cross(u, n)) * (width  * 0.5)
+        right = glm.normalize(glm.cross(u, n)) * (width * 0.5)
         up_vec = glm.normalize(glm.cross(n, right)) * (height * 0.5)
         c = glm.vec3(*center)
         self.draw_quad(
@@ -1196,7 +1382,8 @@ class Renderer3D:
             tuple(c + right - up_vec),
             tuple(c + right + up_vec),
             tuple(c - right + up_vec),
-            color, wireframe=wireframe,
+            color,
+            wireframe=wireframe,
         )
 
     # ------------------------------------------------------------------
@@ -1224,9 +1411,9 @@ class Renderer3D:
             self._wire["u_color"].value = color
             mesh.vao_wire.render(moderngl.LINES)
         else:
-            self._phong["u_model"].value      = _mat4(model)
+            self._phong["u_model"].value = _mat4(model)
             self._phong["u_model_inv_t"].value = _mat4_inv_t(model)
-            self._phong["u_color"].value       = color
+            self._phong["u_color"].value = color
             self._phong["u_use_texture"].value = False
             mesh.vao_solid.render(moderngl.TRIANGLES)
 
@@ -1239,13 +1426,14 @@ class Renderer3D:
         if path in self._texture_cache:
             return self._texture_cache[path]
         import pygame
+
         surf = pygame.image.load(str(path))
         # Flip vertically: OBJ/PNG origin is top-left, OpenGL is bottom-left
         surf = pygame.transform.flip(surf, False, True)
         surf = surf.convert_alpha()
         w, h = surf.get_size()
-        raw  = pygame.image.tobytes(surf, "RGBA")
-        tex  = self.ctx.texture((w, h), 4, raw)
+        raw = pygame.image.tobytes(surf, "RGBA")
+        tex = self.ctx.texture((w, h), 4, raw)
         tex.filter = (moderngl.LINEAR_MIPMAP_LINEAR, moderngl.LINEAR)
         tex.build_mipmaps()
         self._texture_cache[path] = tex
@@ -1257,7 +1445,7 @@ class Renderer3D:
         Returns a ``GpuMesh3D`` that can be passed to ``draw_mesh()`` each frame.
         The texture cache ensures each image is uploaded only once.
         """
-        obj  = load_obj(path)
+        obj = load_obj(path)
         subs: list[_GpuSubMesh] = []
 
         for sub in obj.submeshes:
@@ -1283,13 +1471,15 @@ class Renderer3D:
 
             mat = sub.material
             color = (*mat.diffuse, mat.alpha)
-            subs.append(_GpuSubMesh(
-                vao_solid  = vao_solid,
-                vao_shadow = vao_shadow,
-                texture    = tex,
-                color      = color,
-                shininess  = mat.shininess,
-            ))
+            subs.append(
+                _GpuSubMesh(
+                    vao_solid=vao_solid,
+                    vao_shadow=vao_shadow,
+                    texture=tex,
+                    color=color,
+                    shininess=mat.shininess,
+                )
+            )
 
         return GpuMesh3D(subs, name=obj.name)
 
@@ -1314,16 +1504,16 @@ class Renderer3D:
                 self._shadow["u_model"].value = _mat4(model)
                 sub.vao_shadow.render(moderngl.TRIANGLES)
             else:
-                self._phong["u_model"].value       = _mat4(model)
-                self._phong["u_model_inv_t"].value  = _mat4_inv_t(model)
+                self._phong["u_model"].value = _mat4(model)
+                self._phong["u_model_inv_t"].value = _mat4_inv_t(model)
                 if sub.texture is not None:
                     sub.texture.use(0)
                     self._phong["u_use_texture"].value = True
-                    self._phong["u_color"].value       = (1.0, 1.0, 1.0, sub.color[3])
+                    self._phong["u_color"].value = (1.0, 1.0, 1.0, sub.color[3])
                 else:
                     self._white_tex.use(0)
                     self._phong["u_use_texture"].value = False
-                    self._phong["u_color"].value       = sub.color
+                    self._phong["u_color"].value = sub.color
                 sub.vao_solid.render(moderngl.TRIANGLES)
         # Restore white fallback so subsequent non-mesh draw_* calls work correctly
         if not self._in_shadow_pass:
@@ -1337,17 +1527,16 @@ class Renderer3D:
 
     def _build_mesh(self, key: str) -> _GpuMesh:
         builders: dict[str, tuple] = {
-            "box":      (_build_box_solid,      _build_box_wire),
-            "sphere":   (_build_sphere_solid,   _build_sphere_wire),
+            "box": (_build_box_solid, _build_box_wire),
+            "sphere": (_build_sphere_solid, _build_sphere_wire),
             "cylinder": (_build_cylinder_solid, _build_cylinder_wire),
-            "cone":     (_build_cone_solid,     _build_cone_wire),
-            "capsule":  (_build_capsule_solid,  _build_capsule_wire),
-            "plane":    (_build_plane_solid,    None),
+            "cone": (_build_cone_solid, _build_cone_wire),
+            "capsule": (_build_capsule_solid, _build_capsule_wire),
+            "plane": (_build_plane_solid, None),
         }
         if key not in builders:
             raise ValueError(f"Unknown primitive: {key!r}")
         solid_fn, wire_fn = builders[key]
         sv, si = solid_fn()
         wv, wi = wire_fn() if wire_fn else (None, None)
-        return _GpuMesh(self.ctx, self._phong, self._wire, self._shadow,
-                        sv, si, wv, wi)
+        return _GpuMesh(self.ctx, self._phong, self._wire, self._shadow, sv, si, wv, wi)

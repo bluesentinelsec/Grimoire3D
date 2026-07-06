@@ -112,7 +112,6 @@ class TestBloomShaderSources(unittest.TestCase):
         from grimoire3d.presentation.shaders3d import BLOOM_COMPOSITE_FRAG
 
         self.assertIn("u_intensity", BLOOM_COMPOSITE_FRAG)
-        self.assertIn("u_scene", BLOOM_COMPOSITE_FRAG)
         self.assertIn("u_bloom", BLOOM_COMPOSITE_FRAG)
 
     def test_shaders_have_output(self):
