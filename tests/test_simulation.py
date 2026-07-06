@@ -6,9 +6,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.logic.simulation import SimulationClock
-from grimoire2d.logic.input_router import StaticInputSource, route_inputs
-from grimoire2d.models.input_frame import InputFrame
+from grimoire3d.logic.simulation import SimulationClock
+from grimoire3d.logic.input_router import StaticInputSource, route_inputs
+from grimoire3d.models.input_frame import InputFrame
 
 
 class TestSimulationClock(unittest.TestCase):

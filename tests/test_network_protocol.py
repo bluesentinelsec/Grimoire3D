@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.logic.network_protocol import (
+from grimoire3d.logic.network_protocol import (
     encode_frame,
     decode_frame,
     encode_state,
@@ -15,8 +15,8 @@ from grimoire2d.logic.network_protocol import (
     read_length,
     LENGTH_PREFIX_SIZE,
 )
-from grimoire2d.models.input_frame import InputFrame
-from grimoire2d.presentation.tcp_transport import InMemoryTransport
+from grimoire3d.models.input_frame import InputFrame
+from grimoire3d.presentation.tcp_transport import InMemoryTransport
 
 
 class TestLengthPrefix(unittest.TestCase):
@@ -132,7 +132,7 @@ class TestInMemoryTransport(unittest.TestCase):
 
     def test_transport_as_input_source_in_route_inputs(self):
         """InMemoryTransport satisfies the InputSource protocol for route_inputs."""
-        from grimoire2d.logic.input_router import route_inputs
+        from grimoire3d.logic.input_router import route_inputs
         a, b = InMemoryTransport.make_pair("P1", "P2")
         frame = InputFrame(player_id="P1", tick=7, actions=frozenset(["score"]))
         a.send_frame(frame)

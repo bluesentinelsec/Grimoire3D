@@ -1,4 +1,4 @@
-# uv_cube.obj — synthetic test asset for Grimoire2D Phase 3
+# uv_cube.obj — synthetic test asset for Grimoire3D Phase 3
 # Unit cube, 6 faces (quads), each face UV-mapped to a distinct checker quadrant.
 mtllib uv_cube.mtl
 o uv_cube

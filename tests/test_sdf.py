@@ -1,4 +1,4 @@
-"""Unit tests for grimoire2d.logic.sdf — pure Python SDF reference implementations.
+"""Unit tests for grimoire3d.logic.sdf — pure Python SDF reference implementations.
 
 All tests run headlessly with no GL context required.
 """
@@ -7,7 +7,7 @@ from __future__ import annotations
 import math
 import unittest
 
-from grimoire2d.logic.sdf import (
+from grimoire3d.logic.sdf import (
     sdf_circle,
     sdf_rect,
     sdf_ring,

@@ -36,8 +36,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import pygame
 
-from grimoire2d.presentation.window import GameWindow
-from grimoire2d.gui import (
+from grimoire3d.presentation.window import GameWindow
+from grimoire3d.gui import (
     GUIManager,
     Frame,
     Label,
@@ -603,7 +603,7 @@ def _update_ui(ui_refs: dict[str, Any]) -> None:
 
 
 def main() -> None:
-    print("Grimoire2D GUI Widgets Demo — Tiled-style editor")
+    print("Grimoire3D GUI Widgets Demo — Tiled-style editor")
     print(
         "Exercise every widget. Watch for highlights, live updates, paints, menus, drags, etc."
     )
@@ -639,7 +639,7 @@ def main() -> None:
         )
 
     win = GameWindow(
-        "Grimoire2D — Tiled-like GUI Demo (all widgets)",
+        "Grimoire3D — Tiled-like GUI Demo (all widgets)",
         virtual_width=VIRTUAL_WIDTH,
         virtual_height=VIRTUAL_HEIGHT,
         font_bytes=font_bytes,

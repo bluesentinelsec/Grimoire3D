@@ -34,13 +34,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import pygame
 
-from grimoire2d.presentation.window import GameWindow
-from grimoire2d.models.pause import PauseState, GROUP_GAMEPLAY
-from grimoire2d.models.multiplayer import MultiplayerConfig
-from grimoire2d.logic.pause_logic import toggle_pause, is_paused
+from grimoire3d.presentation.window import GameWindow
+from grimoire3d.models.pause import PauseState, GROUP_GAMEPLAY
+from grimoire3d.models.multiplayer import MultiplayerConfig
+from grimoire3d.logic.pause_logic import toggle_pause, is_paused
 
 if TYPE_CHECKING:
-    from grimoire2d.presentation.renderer import Renderer
+    from grimoire3d.presentation.renderer import Renderer
 
 # ---------------------------------------------------------------------------
 # Actor helpers
@@ -197,7 +197,7 @@ def _draw_pause_overlay(r: Renderer, uf: int, s: float, lw: float, lh: float) ->
 def main() -> None:
     # Virtual coordinate space: 1280×720. The engine scales to the user's
     # display and letterboxes to preserve aspect ratio automatically.
-    win = GameWindow("Grimoire2D — Pause Demo", virtual_width=1280, virtual_height=720)
+    win = GameWindow("Grimoire3D — Pause Demo", virtual_width=1280, virtual_height=720)
     r = win.renderer
 
     # Fixed virtual layout constants

@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.player import (
+from grimoire3d.models.player import (
     PlayerIdentity,
     PlayerRoster,
     ROLE_LOCAL,

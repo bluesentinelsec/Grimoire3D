@@ -14,7 +14,7 @@ _src = Path(__file__).parent.parent / "src"
 if _src.exists():
     sys.path.insert(0, str(_src))
 
-from grimoire2d.gui.widgets import (  # noqa: E402
+from grimoire3d.gui.widgets import (  # noqa: E402
     Canvas,
     Entry,
     Frame,
@@ -30,8 +30,8 @@ from grimoire2d.gui.widgets import (  # noqa: E402
     Sizegrip,
     Scrollbar,
 )
-from grimoire2d.gui import GUIManager  # noqa: E402
-from grimoire2d.gui.layouts import GridLayout  # noqa: E402
+from grimoire3d.gui import GUIManager  # noqa: E402
+from grimoire3d.gui.layouts import GridLayout  # noqa: E402
 
 
 class TestCanvasBasic(unittest.TestCase):

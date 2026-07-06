@@ -1,4 +1,4 @@
-"""Mock-up of a Tiled-like map editor demonstrating all Grimoire2D drawing primitives.
+"""Mock-up of a Tiled-like map editor demonstrating all Grimoire3D drawing primitives.
 
 Uses GameWindow with a fixed 1280×720 virtual design space. The engine
 handles HiDPI, window resize, letterboxing, and centering automatically.
@@ -20,11 +20,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import pygame
 
-from grimoire2d.presentation.window import GameWindow
-from grimoire2d.presentation.pixel_buffer import PixelBuffer
+from grimoire3d.presentation.window import GameWindow
+from grimoire3d.presentation.pixel_buffer import PixelBuffer
 
 if TYPE_CHECKING:
-    from grimoire2d.presentation.renderer import Renderer
+    from grimoire3d.presentation.renderer import Renderer
 
 # ---------------------------------------------------------------------------
 # Colour palette (RGBA floats 0..1)
@@ -544,7 +544,7 @@ def main() -> None:
     simply draws and receives input in the stable virtual coordinate space.
     """
     win = GameWindow(
-        "Grimoire2D — Editor Mockup (HiDPI)", virtual_width=1280, virtual_height=720
+        "Grimoire3D — Editor Mockup (HiDPI)", virtual_width=1280, virtual_height=720
     )
     r = win.renderer
     ctx = r.ctx

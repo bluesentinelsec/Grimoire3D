@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.mouse_state import MouseButton, MouseState
+from grimoire3d.models.mouse_state import MouseButton, MouseState
 
 
 class TestMouseButton(unittest.TestCase):

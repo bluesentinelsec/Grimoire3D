@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.multiplayer import (
+from grimoire3d.models.multiplayer import (
     MultiplayerConfig,
     ViewportAssignment,
     SimulationState,
@@ -15,7 +15,7 @@ from grimoire2d.models.multiplayer import (
     TOPOLOGY_NETWORK_HOST,
     TOPOLOGY_NETWORK_CLIENT,
 )
-from grimoire2d.models.player import PlayerIdentity, ROLE_LOCAL, ROLE_REMOTE
+from grimoire3d.models.player import PlayerIdentity, ROLE_LOCAL, ROLE_REMOTE
 
 
 class TestViewportAssignment(unittest.TestCase):
@@ -119,7 +119,7 @@ class TestMultiplayerConfig(unittest.TestCase):
         self.assertEqual(cfg.tick_rate, 60)
 
     def test_registered_as_extension(self):
-        from grimoire2d.models import EngineConfig
+        from grimoire3d.models import EngineConfig
         engine = EngineConfig.default()
         self.assertIn("multiplayer", engine.extensions)
         self.assertIsInstance(engine.extensions["multiplayer"], MultiplayerConfig)

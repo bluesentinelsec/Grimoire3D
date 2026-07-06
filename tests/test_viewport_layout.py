@@ -6,8 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.logic.viewport_layout import compute_viewports
-from grimoire2d.models.multiplayer import (
+from grimoire3d.logic.viewport_layout import compute_viewports
+from grimoire3d.models.multiplayer import (
     MultiplayerConfig,
     ViewportAssignment,
     TOPOLOGY_SHARED_SCREEN,
@@ -15,7 +15,7 @@ from grimoire2d.models.multiplayer import (
     TOPOLOGY_NETWORK_HOST,
     TOPOLOGY_NETWORK_CLIENT,
 )
-from grimoire2d.models.player import PlayerIdentity, ROLE_LOCAL, ROLE_REMOTE
+from grimoire3d.models.player import PlayerIdentity, ROLE_LOCAL, ROLE_REMOTE
 
 W, H = 1280.0, 720.0
 

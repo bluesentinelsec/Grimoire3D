@@ -6,8 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.actor import Actor
-from grimoire2d.models.components import TransformComponent, VelocityComponent
+from grimoire3d.models.actor import Actor
+from grimoire3d.models.components import TransformComponent, VelocityComponent
 
 
 class TestActorDefaults(unittest.TestCase):

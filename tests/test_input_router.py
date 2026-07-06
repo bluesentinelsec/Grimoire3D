@@ -6,13 +6,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.logic.input_router import (
+from grimoire3d.logic.input_router import (
     LocalInputSource,
     StaticInputSource,
     SequencedInputSource,
     route_inputs,
 )
-from grimoire2d.models.input_frame import InputFrame
+from grimoire3d.models.input_frame import InputFrame
 
 
 class TestLocalInputSource(unittest.TestCase):

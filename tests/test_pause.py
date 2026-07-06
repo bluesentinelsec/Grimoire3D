@@ -6,15 +6,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.pause import (
+from grimoire3d.models.pause import (
     PauseState,
     GROUP_GAMEPLAY,
     GROUP_AUDIO,
     GROUP_UI,
     GROUP_INPUT,
 )
-from grimoire2d.models.multiplayer import MultiplayerConfig
-from grimoire2d.logic.pause_logic import (
+from grimoire3d.models.multiplayer import MultiplayerConfig
+from grimoire3d.logic.pause_logic import (
     can_pause,
     request_pause,
     request_unpause,
@@ -95,7 +95,7 @@ class TestPauseState(unittest.TestCase):
         self.assertFalse(ps.any_paused())
 
     def test_registered_as_engine_config_extension(self):
-        from grimoire2d.models import EngineConfig
+        from grimoire3d.models import EngineConfig
         engine = EngineConfig.default()
         self.assertIn("pause", engine.extensions)
         self.assertIsInstance(engine.extensions["pause"], PauseState)

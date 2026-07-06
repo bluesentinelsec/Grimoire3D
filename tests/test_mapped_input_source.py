@@ -6,13 +6,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.gamepad_state import GamepadButton, GamepadState
-from grimoire2d.models.input_binding import GamepadButtonBinding, KeyBinding
-from grimoire2d.models.input_frame import InputFrame
-from grimoire2d.models.input_map import InputMap
-from grimoire2d.models.mouse_state import MouseState
-from grimoire2d.models.raw_input_frame import RawInputFrame
-from grimoire2d.presentation.mapped_input_source import MappedInputSource
+from grimoire3d.models.gamepad_state import GamepadButton, GamepadState
+from grimoire3d.models.input_binding import GamepadButtonBinding, KeyBinding
+from grimoire3d.models.input_frame import InputFrame
+from grimoire3d.models.input_map import InputMap
+from grimoire3d.models.mouse_state import MouseState
+from grimoire3d.models.raw_input_frame import RawInputFrame
+from grimoire3d.presentation.mapped_input_source import MappedInputSource
 
 
 def _raw(keys: frozenset[str] = frozenset(),

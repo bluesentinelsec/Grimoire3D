@@ -1,4 +1,4 @@
-"""Showcase of all Grimoire2D drawing primitives across 7 animated scenes.
+"""Showcase of all Grimoire3D drawing primitives across 7 animated scenes.
 
 All drawing is performed in a fixed 1280×720 virtual coordinate space.
 The GameWindow + engine handle HiDPI, letterboxing, centering, and
@@ -24,10 +24,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import pygame
 import moderngl
 
-from grimoire2d.presentation.window import GameWindow
+from grimoire3d.presentation.window import GameWindow
 
 if TYPE_CHECKING:
-    from grimoire2d.presentation.renderer import Renderer
+    from grimoire3d.presentation.renderer import Renderer
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -672,7 +672,7 @@ def main() -> None:
     # Fixed 1280×720 virtual space. GameWindow + engine manage the rest:
     # HiDPI, resizable window, letterboxing/pillarboxing, centering, scaling.
     win = GameWindow(
-        "Grimoire2D — Primitives Showcase", virtual_width=1280, virtual_height=720
+        "Grimoire3D — Primitives Showcase", virtual_width=1280, virtual_height=720
     )
     r = win.renderer
     ctx = r.ctx

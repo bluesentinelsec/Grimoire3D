@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.input_frame import InputFrame, InputBuffer
+from grimoire3d.models.input_frame import InputFrame, InputBuffer
 
 
 class TestInputFrame(unittest.TestCase):
