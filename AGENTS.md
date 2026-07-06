@@ -39,7 +39,7 @@ Internals **must** keep data model, business rules/logic, and rendering/views se
 The Engine (core) owns/co-ordinates subsystems. Subsystems do **not** import the Engine circularly; use dependency injection (pass what they need at construction or via protocols) or a narrow, well-defined context object.
 
 ### "The Game Is Just Data" + VFS
-- **Every** asset load (textures, shaders, sounds, fonts, level data, config JSON, even internal defaults if any) **must** go through `grimoire2d.assets.vfs`.
+- **Every** asset load (textures, shaders, sounds, fonts, level data, config JSON, even internal defaults if any) **must** go through `grimoire3d.assets.vfs`.
 - Dev mode: VFS can overlay real filesystem for instant hot-reload without repacking.
 - Prod: Load exclusively from a single (optionally obfuscated) zip archive. Obfuscation = simple symmetric cipher only (casual protection).
 - User games point at their archive or folder; engine abstracts the rest.
@@ -61,7 +61,7 @@ If you ever feel the need to call `gl*` or `moderngl` directly from outside pres
 - No decorators that hide control flow or registration (unless the decorator is the *only* public API and its effect is trivial and documented in one place).
 - No monkey-patching. No `if TYPE_CHECKING` hacks to break import cycles — fix the cycle by proper layering.
 - Configuration is explicit and runtime-mutable. Systems that care register interest or poll the current config snapshot.
-- Namespaces: `from grimoire2d.presentation import Camera` or `import grimoire2d.presentation as pres`. Avoid dumping everything into the top `grimoire2d` namespace except the absolute minimum (run, App, version, etc.).
+- Namespaces: `from grimoire3d.presentation import Camera` or `import grimoire3d.presentation as pres`. Avoid dumping everything into the top `grimoire3d` namespace except the absolute minimum (run, App, version, etc.).
 - Prefer composition and protocols (PEP 544) over deep inheritance for extension points.
 - For data models specifically: EngineConfig contains *literally nothing* except `version` and an `extensions: dict[str, DataModel]`. All configuration (common or game-specific) is delivered exclusively through registered extensions.
   - Goal: PRs should be *exclusively* net-new code (maximum OCP).
@@ -86,7 +86,7 @@ If you ever feel the need to call `gl*` or `moderngl` directly from outside pres
 ### Error Handling & Invariants
 - Fail fast, openly, and transparently
 - Errors should present to both console and GUI
-- Define and use specific exceptions in `grimoire2d.exceptions`.
+- Define and use specific exceptions in `grimoire3d.exceptions`.
 - Fail fast and loud on programmer errors / bad data in dev. Good error messages with hints.
 - In production paths, still validate critical invariants but don't crash the player's game on recoverable asset issues (graceful fallback + log).
 - Asserts / debug checks for architectural invariants (e.g. "batch is flushed before state change").
@@ -106,7 +106,7 @@ If you ever feel the need to call `gl*` or `moderngl` directly from outside pres
 - **Docstrings**: Every public (and most internal) function, class, and module gets a docstring describing purpose, parameters, returns, important side-effects, invariants, and when it is safe to call. NumPy or Google style — be consistent.
 - **Function size**: Small. If a function does two things, split it. SRP applies to functions too.
 - **Comments**: Only for *why* (architectural decisions, non-obvious tradeoffs, engine patterns being followed). Never for "what" if the code + name already say it. No tactical "fix for issue #123" comments that rot.
-- **Imports**: Absolute within the package. Group stdlib, third-party, local. Use `import grimoire2d.presentation as presentation` style inside the lib for clarity.
+- **Imports**: Absolute within the package. Group stdlib, third-party, local. Use `import grimoire3d.presentation as presentation` style inside the lib for clarity.
 - **No print, no pdb in library code**. Use `logging.getLogger(__name__)` with proper levels.
 - **Mutable vs immutable**: Document the contract. Positions/velocities in games are typically mutated in place for perf — provide clear `copy()` / immutable views when needed.
 - **Third-party deps**: Only mature, stable, performant, minimal-transitive-dep libraries. Pin versions in pyproject.toml. Never GPL/AGPL that would infect user games. pygame-ce is blessed. pymunk (or evaluated alternative) for physics. Minimal else.
@@ -166,14 +166,14 @@ If you are about to do any of the above, **you must stop**, document the tension
 9. If the change affects public API, hot-reload contract, packaging, or performance bar, update design-goals.md and this file.
 10. Only then consider the work done. Half-measures are not "done".
 
-For spikes/prototypes: they may live in a `spikes/` or `demos/` temporarily, but anything that graduates into `src/grimoire2d/` must be brought up to the standards in this file with no debt left behind.
+For spikes/prototypes: they may live in a `spikes/` or `demos/` temporarily, but anything that graduates into `src/grimoire3d/` must be brought up to the standards in this file with no debt left behind.
 
 ## 9. Packaging, Distribution & CI Notes
 
 - `pyproject.toml` is the single source for dependencies, entry points, package data (include shader defaults? default skins?).
-- The package must be importable and functional after `pip install grimoire2d` and after PyInstaller bundling on all three platforms.
+- The package must be importable and functional after `pip install grimoire3d` and after PyInstaller bundling on all three platforms.
 - CI runs tests on all three OSes. GL context creation must be robust (or tests that require a real window are marked appropriately and still exercised in demos).
-- Versioning follows semantic versioning. `__version__` in `grimoire2d/__init__.py`.
+- Versioning follows semantic versioning. `__version__` in `grimoire3d/__init__.py`.
 
 ## 10. When in Doubt (from design-goals.md + this file)
 

@@ -155,7 +155,7 @@ def build_cube_obj() -> str:
     ]
 
     lines: list[str] = [
-        "# uv_cube.obj — synthetic test asset for Grimoire2D Phase 3",
+        "# uv_cube.obj — synthetic test asset for Grimoire3D Phase 3",
         "# Unit cube, 6 faces (quads), each face UV-mapped to a distinct checker quadrant.",
         "mtllib uv_cube.mtl",
         "o uv_cube",
@@ -265,7 +265,7 @@ def build_icosphere(subdivisions: int = 2) -> str:
         faces = new_faces
 
     lines: list[str] = [
-        "# low_poly_sphere.obj — synthetic icosphere for Grimoire2D Phase 3",
+        "# low_poly_sphere.obj — synthetic icosphere for Grimoire3D Phase 3",
         f"# {subdivisions} subdivisions → {len(faces)} triangles, {len(verts)} vertices.",
         "# No external material — uses vertex normals only.",
         "o low_poly_sphere",

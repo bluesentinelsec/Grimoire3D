@@ -6,14 +6,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.input_binding import (
+from grimoire3d.models.input_binding import (
     GamepadAxisBinding,
     GamepadButtonBinding,
     KeyBinding,
     MouseButtonBinding,
 )
-from grimoire2d.models.gamepad_state import GamepadAxis, GamepadButton
-from grimoire2d.models.input_map import InputMap
+from grimoire3d.models.gamepad_state import GamepadAxis, GamepadButton
+from grimoire3d.models.input_map import InputMap
 
 
 class TestInputMapConstruction(unittest.TestCase):

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from grimoire2d.logic.collision import AABB, CollisionWorld
+from grimoire3d.logic.collision import AABB, CollisionWorld
 
 R = 0.3    # player capsule radius used throughout
 H = 1.8    # player capsule height

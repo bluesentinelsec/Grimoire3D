@@ -37,15 +37,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import glm
 
-from grimoire2d.presentation.window import GameWindow
-from grimoire2d.presentation.renderer3d import Renderer3D
-from grimoire2d.models.render_settings_3d import RenderSettings3D
-from grimoire2d.models.light3d import (
+from grimoire3d.presentation.window import GameWindow
+from grimoire3d.presentation.renderer3d import Renderer3D
+from grimoire3d.models.render_settings_3d import RenderSettings3D
+from grimoire3d.models.light3d import (
     AmbientLight, DirectionalLight, PointLight, SpotLight, SkyGradient,
 )
-from grimoire2d.logic.camera3d import FreelookCamera
-from grimoire2d.logic.fixed_timestep import FixedTimestep
-from grimoire2d.logic.collision import CollisionWorld
+from grimoire3d.logic.camera3d import FreelookCamera
+from grimoire3d.logic.fixed_timestep import FixedTimestep
+from grimoire3d.logic.collision import CollisionWorld
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -309,7 +309,7 @@ def draw_room(r3d: Renderer3D, flashlight_on: bool, flashlight: SpotLight) -> No
 # ---------------------------------------------------------------------------
 
 def run() -> None:
-    win = GameWindow("Grimoire2D — 3D Phase 4", virtual_width=VIRTUAL_W,
+    win = GameWindow("Grimoire3D — 3D Phase 4", virtual_width=VIRTUAL_W,
                      virtual_height=VIRTUAL_H, target_fps=60, bar_color=(8, 10, 14, 255))
 
     settings = RenderSettings3D(specular=True, fog=True,
@@ -491,7 +491,7 @@ def run() -> None:
         active_sl  = r3d.last_spot_lights_active
 
         r.draw_text(
-            f"Grimoire2D  Phase 4  |  FPS: {fps:5.1f}  |  Shadow map: {sm}×{sm}",
+            f"Grimoire3D  Phase 4  |  FPS: {fps:5.1f}  |  Shadow map: {sm}×{sm}",
             14, 8, font_size=26, color=(0.9, 0.95, 1.0, 1.0),
         )
         r.draw_text(

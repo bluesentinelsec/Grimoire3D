@@ -6,9 +6,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.gamepad_state import GamepadAxis, GamepadButton, GamepadState
-from grimoire2d.models.mouse_state import MouseButton, MouseState
-from grimoire2d.models.raw_input_frame import RawInputFrame
+from grimoire3d.models.gamepad_state import GamepadAxis, GamepadButton, GamepadState
+from grimoire3d.models.mouse_state import MouseButton, MouseState
+from grimoire3d.models.raw_input_frame import RawInputFrame
 
 
 class TestRawInputFrameDefaults(unittest.TestCase):

@@ -31,12 +31,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import glm
 
-from grimoire2d.presentation.window import GameWindow
-from grimoire2d.presentation.renderer3d import Renderer3D
-from grimoire2d.models.render_settings_3d import RenderSettings3D
-from grimoire2d.models.light3d import AmbientLight, DirectionalLight, PointLight
-from grimoire2d.logic.camera3d import FreelookCamera
-from grimoire2d.logic.fixed_timestep import FixedTimestep
+from grimoire3d.presentation.window import GameWindow
+from grimoire3d.presentation.renderer3d import Renderer3D
+from grimoire3d.models.render_settings_3d import RenderSettings3D
+from grimoire3d.models.light3d import AmbientLight, DirectionalLight, PointLight
+from grimoire3d.logic.camera3d import FreelookCamera
+from grimoire3d.logic.fixed_timestep import FixedTimestep
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -110,7 +110,7 @@ def draw_scene(r3d: Renderer3D, wireframe: bool, t: float) -> None:
 
 def run() -> None:
     win = GameWindow(
-        "Grimoire2D — 3D Phase 2",
+        "Grimoire3D — 3D Phase 2",
         virtual_width=VIRTUAL_W,
         virtual_height=VIRTUAL_H,
         target_fps=60,
@@ -241,7 +241,7 @@ def run() -> None:
         wire = "ON " if wireframe         else "OFF"
 
         sm = r3d.shadow_map_size
-        r.draw_text(f"Grimoire2D  |  3D Phase 2  |  FPS: {fps:5.1f}  |  Shadow map: {sm}×{sm}",
+        r.draw_text(f"Grimoire3D  |  3D Phase 2  |  FPS: {fps:5.1f}  |  Shadow map: {sm}×{sm}",
                     14, 8, font_size=26, color=(0.9, 0.95, 1.0, 1.0))
         r.draw_text(
             f"[⇧S] Specular: {spec}   [⇧F] Fog: {fog}   [⇧H] Shadows: {shad}   "

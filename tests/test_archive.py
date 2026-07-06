@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from grimoire2d.assets import create_archive, extract_archive
-from grimoire2d.assets.vfs import VFS, ZipProvider
+from grimoire3d.assets import create_archive, extract_archive
+from grimoire3d.assets.vfs import VFS, ZipProvider
 
 
 def _write_tree(root: Path, tree: dict[str, bytes | dict]) -> None:

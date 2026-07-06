@@ -14,7 +14,7 @@ _src = Path(__file__).parent.parent / "src"
 if _src.exists():
     sys.path.insert(0, str(_src))
 
-from grimoire2d.models import (
+from grimoire3d.models import (
     EngineConfig,
     DataModel,
     LifecycleState,
@@ -22,7 +22,7 @@ from grimoire2d.models import (
     AppState,
     VirtualResolution,
 )
-from grimoire2d.logic.scaling import Viewport, compute_viewport, get_virtual_resolution
+from grimoire3d.logic.scaling import Viewport, compute_viewport, get_virtual_resolution
 
 
 class TestLifecycleState(unittest.TestCase):
@@ -274,7 +274,7 @@ class TestScalingLogic(unittest.TestCase):
 
         This is how the presentation layer will actually use it at runtime.
         """
-        from grimoire2d.models import EngineConfig
+        from grimoire3d.models import EngineConfig
 
         engine = EngineConfig.default()
         # Replace the default with a non-standard virtual res

@@ -6,10 +6,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.actor import Actor
-from grimoire2d.models.components import TransformComponent
-from grimoire2d.models.scene import Scene, SCENE_STATUS_ACTIVE
-from grimoire2d.models.scene_graph import SceneGraph
+from grimoire3d.models.actor import Actor
+from grimoire3d.models.components import TransformComponent
+from grimoire3d.models.scene import Scene, SCENE_STATUS_ACTIVE
+from grimoire3d.models.scene_graph import SceneGraph
 
 
 def _make_scene(sid: str, name: str = "Test") -> Scene:

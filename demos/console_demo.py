@@ -35,8 +35,8 @@ import pygame
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from grimoire2d.presentation.window import GameWindow
-from grimoire2d.gui.console import InGameConsole
+from grimoire3d.presentation.window import GameWindow
+from grimoire3d.gui.console import InGameConsole
 
 # ---------------------------------------------------------------------------
 # Demo state
@@ -68,7 +68,7 @@ def _color_name_to_bar(name: str) -> tuple[int, int, int, int]:
 
 def run() -> None:
     win = GameWindow(
-        "Grimoire2D — Console Demo",
+        "Grimoire3D — Console Demo",
         virtual_width=VIRTUAL_W,
         virtual_height=VIRTUAL_H,
         target_fps=60,
@@ -163,7 +163,7 @@ def run() -> None:
     console.register_command("demo.enabled",   cmd_enabled,    description="demo.enabled [on|off] — disable/re-enable the console")
 
     # Greet
-    console.print("Grimoire2D In-Game Console  —  type 'help' or 'std.help' for commands.", kind="info")
+    console.print("Grimoire3D In-Game Console  —  type 'help' or 'std.help' for commands.", kind="info")
     console.print("Tab/Shift+Tab=complete  ↑↓=history  Ctrl+R=search  Cmd/Ctrl+C=copy  Cmd/Ctrl+V=paste", kind="info")
     console.print("Click+drag in the input row to select text.  PgUp/Dn=scroll", kind="info")
 

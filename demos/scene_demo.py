@@ -31,10 +31,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import pygame
 
-from grimoire2d.presentation.window import GameWindow
-from grimoire2d.models.components import TransformComponent
-from grimoire2d.models.scene_graph import SceneGraph
-from grimoire2d.logic.scene_ops import (
+from grimoire3d.presentation.window import GameWindow
+from grimoire3d.models.components import TransformComponent
+from grimoire3d.models.scene_graph import SceneGraph
+from grimoire3d.logic.scene_ops import (
     create_scene,
     set_active_scene,
     spawn_actor,

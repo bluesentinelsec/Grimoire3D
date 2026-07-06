@@ -6,8 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.gamepad_state import GamepadAxis, GamepadButton, GamepadState
-from grimoire2d.logic.gamepad_ops import (
+from grimoire3d.models.gamepad_state import GamepadAxis, GamepadButton, GamepadState
+from grimoire3d.logic.gamepad_ops import (
     deadzone,
     get_stick_vector,
     is_axis_pressed,

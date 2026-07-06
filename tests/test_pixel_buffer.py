@@ -1,4 +1,4 @@
-"""Unit tests for grimoire2d.presentation.pixel_buffer.
+"""Unit tests for grimoire3d.presentation.pixel_buffer.
 
 Tests exercise the pure CPU-side logic (bytearray state) through a
 lightweight mock GL context — no real OpenGL window is required.
@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import unittest
 
-from grimoire2d.presentation.pixel_buffer import PixelBuffer
+from grimoire3d.presentation.pixel_buffer import PixelBuffer
 
 
 class _FakeTexture:

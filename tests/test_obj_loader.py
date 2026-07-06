@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from grimoire2d.assets.obj_loader import (
+from grimoire3d.assets.obj_loader import (
     ObjMesh,
     SubMeshData,
     MtlMaterial,

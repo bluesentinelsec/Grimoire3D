@@ -6,14 +6,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.components import TransformComponent
-from grimoire2d.models.scene import (
+from grimoire3d.models.components import TransformComponent
+from grimoire3d.models.scene import (
     SCENE_STATUS_ACTIVE,
     SCENE_STATUS_CLOSING,
     SCENE_STATUS_LOADING,
 )
-from grimoire2d.models.scene_graph import SceneGraph
-from grimoire2d.logic.scene_ops import (
+from grimoire3d.models.scene_graph import SceneGraph
+from grimoire3d.logic.scene_ops import (
     create_scene,
     close_scene,
     set_active_scene,
@@ -409,7 +409,7 @@ class TestRemoveComponent(unittest.TestCase):
         self.assertNotIn("transform", g2.actors[aid].components)
 
     def test_other_components_unaffected(self):
-        from grimoire2d.models.components import VelocityComponent
+        from grimoire3d.models.components import VelocityComponent
         tf = TransformComponent()
         vel = VelocityComponent(vx=1.0)
         g, sid = _graph_with_scene()

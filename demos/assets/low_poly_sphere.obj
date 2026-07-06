@@ -1,4 +1,4 @@
-# low_poly_sphere.obj — synthetic icosphere for Grimoire2D Phase 3
+# low_poly_sphere.obj — synthetic icosphere for Grimoire3D Phase 3
 # 2 subdivisions → 320 triangles, 162 vertices.
 # No external material — uses vertex normals only.
 o low_poly_sphere

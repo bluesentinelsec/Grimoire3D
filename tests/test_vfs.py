@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from grimoire2d.assets import VFS as PublicVFS, create_archive
-from grimoire2d.assets.vfs import (
+from grimoire3d.assets import VFS as PublicVFS, create_archive
+from grimoire3d.assets.vfs import (
     DirProvider,
     MemoryProvider,
     VirtualFileSystem,
     ZipProvider,
     _apply_cipher,
 )
-from grimoire2d.exceptions import AssetNotFound
+from grimoire3d.exceptions import AssetNotFound
 
 
 # --------------------------------------------------------------------------- #

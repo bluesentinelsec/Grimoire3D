@@ -26,12 +26,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import glm
 
-from grimoire2d.presentation.window import GameWindow
-from grimoire2d.presentation.renderer3d import Renderer3D
-from grimoire2d.models.render_settings_3d import RenderSettings3D
-from grimoire2d.models.light3d import AmbientLight, DirectionalLight, PointLight
-from grimoire2d.logic.camera3d import PerspectiveCamera
-from grimoire2d.logic.fixed_timestep import FixedTimestep
+from grimoire3d.presentation.window import GameWindow
+from grimoire3d.presentation.renderer3d import Renderer3D
+from grimoire3d.models.render_settings_3d import RenderSettings3D
+from grimoire3d.models.light3d import AmbientLight, DirectionalLight, PointLight
+from grimoire3d.logic.camera3d import PerspectiveCamera
+from grimoire3d.logic.fixed_timestep import FixedTimestep
 
 # ---------------------------------------------------------------------------
 # Scene constants
@@ -65,7 +65,7 @@ SKY_COLOR = (0.05, 0.07, 0.18, 1.0)   # deep blue night sky
 
 def run() -> None:
     win = GameWindow(
-        "Grimoire2D — 3D Phase 1",
+        "Grimoire3D — 3D Phase 1",
         virtual_width=VIRTUAL_W,
         virtual_height=VIRTUAL_H,
         target_fps=60,
@@ -222,7 +222,7 @@ def run() -> None:
         fog  = "ON " if settings.fog      else "OFF"
         wire = "ON " if wireframe         else "OFF"
 
-        r.draw_text(f"Grimoire2D  |  3D Phase 1  |  FPS: {fps:5.1f}",
+        r.draw_text(f"Grimoire3D  |  3D Phase 1  |  FPS: {fps:5.1f}",
                     14, 10, font_size=26, color=(0.85, 0.9, 1.0, 1.0))
         r.draw_text(
             f"[S] Specular: {spec}   [F] Fog: {fog}   [W] Wireframe: {wire}   [ESC] Quit",

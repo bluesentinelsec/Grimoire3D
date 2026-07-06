@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import pygame
 
-from grimoire2d.presentation.window import GameWindow
+from grimoire3d.presentation.window import GameWindow
 
 
 def main() -> None:
@@ -40,7 +40,7 @@ def main() -> None:
     print("ESC to quit.")
 
     win = GameWindow(
-        "Grimoire2D — Minimal Window (GameWindow)",
+        "Grimoire3D — Minimal Window (GameWindow)",
         virtual_width=1280,
         virtual_height=720,
     )

@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.models.scene import (
+from grimoire3d.models.scene import (
     Scene,
     SCENE_STATUS_LOADING,
     SCENE_STATUS_ACTIVE,

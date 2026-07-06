@@ -38,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import pygame
 
-from grimoire2d.presentation.window import GameWindow
+from grimoire3d.presentation.window import GameWindow
 
 # ---------------------------------------------------------------------------
 # Fixed 4K virtual coordinate space — never changes
@@ -326,13 +326,13 @@ def draw_coverage_bar(r, scale: float) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    print("Grimoire2D — 4K Resolution Scaling Demo")
+    print("Grimoire3D — 4K Resolution Scaling Demo")
     print(f"Virtual design space: {int(VW)}×{int(VH)}")
     print("GPU always renders at the physical display resolution.")
     print("Resize the window freely — B to toggle border, ESC to quit.")
 
     win = GameWindow(
-        "Grimoire2D — 4K Resolution Scaling Demo",
+        "Grimoire3D — 4K Resolution Scaling Demo",
         virtual_width=int(VW),
         virtual_height=int(VH),
         target_fps=60,

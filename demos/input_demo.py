@@ -34,27 +34,27 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from grimoire2d.presentation.highdpi import enable_highdpi, get_drawable_size
+from grimoire3d.presentation.highdpi import enable_highdpi, get_drawable_size
 
 enable_highdpi()
 
 import pygame
 import moderngl
 
-from grimoire2d.logic.scaling import compute_viewport
-from grimoire2d.models import VirtualResolution
-from grimoire2d.models.gamepad_state import GamepadAxis, GamepadButton
-from grimoire2d.models.input_binding import (
+from grimoire3d.logic.scaling import compute_viewport
+from grimoire3d.models import VirtualResolution
+from grimoire3d.models.gamepad_state import GamepadAxis, GamepadButton
+from grimoire3d.models.input_binding import (
     GamepadAxisBinding,
     GamepadButtonBinding,
     KeyBinding,
     MouseButtonBinding,
 )
-from grimoire2d.models.input_map import InputMap
-from grimoire2d.models.raw_input_frame import RawInputFrame
-from grimoire2d.presentation.input_manager import InputManager
-from grimoire2d.presentation.mapped_input_source import MappedInputSource
-from grimoire2d.presentation.renderer import Renderer
+from grimoire3d.models.input_map import InputMap
+from grimoire3d.models.raw_input_frame import RawInputFrame
+from grimoire3d.presentation.input_manager import InputManager
+from grimoire3d.presentation.mapped_input_source import MappedInputSource
+from grimoire3d.presentation.renderer import Renderer
 
 # ---------------------------------------------------------------------------
 # Layout constants (all in virtual pixels, 1280×720)
@@ -206,7 +206,7 @@ def _draw_mouse(
     cy += 4
 
     btn_labels = ["L", "M", "R", "BK", "FW"]
-    from grimoire2d.models.mouse_state import MouseButton
+    from grimoire3d.models.mouse_state import MouseButton
 
     btn_enums = [
         MouseButton.LEFT,
@@ -307,7 +307,7 @@ def _draw_stick_crosshair(
 def _draw_gamepad(
     r: Renderer, pad_state, x: float, y: float, w: float, h: float, pad_id: int
 ) -> None:
-    from grimoire2d.logic.gamepad_ops import trigger_value
+    from grimoire3d.logic.gamepad_ops import trigger_value
 
     r.draw_rect(x, y, w, h, PANEL_BG)
     r.draw_rect_border(x, y, w, h, 1.0, (0.25, 0.30, 0.45, 1.0))
@@ -404,7 +404,7 @@ def main() -> None:
     log_w, log_h = info.current_w, info.current_h
     flags = pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE
     pygame.display.set_mode((log_w, log_h), flags)
-    pygame.display.set_caption("Grimoire2D — Input System Demo")
+    pygame.display.set_caption("Grimoire3D — Input System Demo")
 
     ctx = moderngl.create_context()
     virt = VirtualResolution(width=VW, height=VH, integer_scaling=False)
@@ -463,7 +463,7 @@ def main() -> None:
         # Title strip
         renderer.draw_rect(0, 0, VW, 38, (0.10, 0.10, 0.16, 1.0))
         renderer.draw_text_centered(
-            "GRIMOIRE2D  —  INPUT SYSTEM DEMO",
+            "GRIMOIRE3D  —  INPUT SYSTEM DEMO",
             VW / 2,
             19,
             color=ACCENT,
