@@ -55,7 +55,7 @@ AA_DISPLAY_NAMES = {
 
 # Grid ground plane
 GRID_SIZE = 40.0
-GRID_CELLS = 20
+GRID_CELLS = 4
 
 # Colors
 GRID_LIGHT = (0.85, 0.85, 0.85, 1.0)
@@ -125,9 +125,9 @@ def draw_thin_poles(r3d: Renderer3D) -> None:
     pole_height = 6.0
     pole_radius = 0.04  # Very thin to exaggerate aliasing
 
-    # Row of fence-like poles along Z axis
-    for i in range(15):
-        x = -7.0 + i * 1.0
+    # Row of fence-like poles
+    for i in range(8):
+        x = -7.0 + i * 2.0
         r3d.draw_cylinder(
             (x, pole_height / 2.0, -10.0),
             radius=pole_radius,
@@ -135,26 +135,15 @@ def draw_thin_poles(r3d: Renderer3D) -> None:
             color=POLE_COLOR,
         )
 
-    # Diagonal arrangement of poles
-    for i in range(10):
-        x = -5.0 + i * 1.2
-        z = 6.0 + i * 0.8
+    # Diagonal arrangement
+    for i in range(5):
+        x = -3.0 + i * 2.0
+        z = 6.0 + i * 1.5
         r3d.draw_cylinder(
             (x, pole_height / 2.0, z),
             radius=pole_radius,
             height=pole_height,
             color=POLE_COLOR,
-        )
-
-    # Angled thin cylinders (leaning poles) — even more aliasing
-    for i in range(6):
-        x = 8.0
-        z = -4.0 + i * 2.0
-        r3d.draw_cylinder(
-            (x, pole_height / 2.0, z),
-            radius=0.05,
-            height=pole_height,
-            color=(0.4, 0.1, 0.1, 1.0),
         )
 
 
