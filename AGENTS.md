@@ -1,16 +1,16 @@
-# AGENTS.md — Grimoire2D Architectural and Coding Rules
+# AGENTS.md — Grimoire3D Architectural and Coding Rules
 
-**This file is the primary source of truth for how to write, structure, and evolve code in this repository.** It takes precedence over all other instructions when working in the Grimoire2D codebase.
+**This file is the primary source of truth for how to write, structure, and evolve code in this repository.** It takes precedence over all other instructions when working in the Grimoire3D codebase.
 
 All AI agents, contributors, and future work **must** follow these rules strictly. Violations (hacks, shortcuts, architectural debt) are not acceptable.
 
 ## 1. Core Mandate (from design-goals.md)
 
-Grimoire2D is a **professional-grade**, opinionated 2D game framework. The philosophy is **"the game is just data"**:
+Grimoire3D is a **professional-grade**, opinionated 3D game framework. The philosophy is **"the game is just data"**:
 
-- The engine correctly and performantly abstracts everything 99% of 2D games need.
+- The engine correctly and performantly abstracts everything 99% of computer games need.
 - User code + media assets (via VFS) provide only what is unique.
-- It must support shipping commercial games on Steam (Windows AMD64, Linux AMD64, macOS ARM) via clean `pip install grimoire2d` + PyInstaller.
+- It must support shipping commercial games on Steam (Windows AMD64, Linux AMD64, macOS ARM) via clean `pip install grimoire3d` + PyInstaller.
 
 **Non-negotiable qualities**:
 - Architecturally correct at every layer. No quick fixes, no deferred bugs, no hacks, no half-measures, no "we'll clean it up later".
@@ -20,7 +20,7 @@ Grimoire2D is a **professional-grade**, opinionated 2D game framework. The philo
 - Self-documenting code. Small, well-named functions. Long-lived comments only.
 - Layered architecture with clear, documented escape hatches.
 - Data-driven: assets/config live in the VFS (zip + optional simple obfuscation), not hardcoded in Python.
-- Follow **known successful patterns from video game engines** (Love2D callback/resource model, Godot hot-reload ergonomics, proper batching/shader pipelines from modern 2D renderers, etc.). Do not reinvent poorly.
+- Follow **known successful patterns from video game engines** (Love2D callback/resource model, Godot hot-reload ergonomics, proper batching/shader pipelines from modern renderers, etc.). Do not reinvent poorly.
 
 If a design decision would require a hack to make progress, **stop and redesign the abstraction properly** before writing the code.
 
