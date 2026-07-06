@@ -9,7 +9,7 @@ objects.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -30,13 +30,15 @@ class RenderSettings3D:
     # Post-process (Phase 6)
     fxaa: bool = False
     bloom: bool = False
+    bloom_threshold: float = 1.0  # luminance cutoff for the bright-pass extraction
+    bloom_intensity: float = 0.3  # strength of the additive bloom composite
 
     # Light budget — lower on constrained hardware; must match GLSL array size in shaders3d.py
     max_point_lights: int = 24
 
     # Post-processing output transform (applied in the final blit pass)
-    gamma: float = 2.2        # standard sRGB gamma; 1.0 = linear (no correction)
-    brightness: float = 1.0   # linear multiplier before gamma; 0.5 = half, 2.0 = double
+    gamma: float = 2.2  # standard sRGB gamma; 1.0 = linear (no correction)
+    brightness: float = 1.0  # linear multiplier before gamma; 0.5 = half, 2.0 = double
 
     # Internal render resolution relative to the output viewport.
     # < 1.0 trades image quality for performance; > 1.0 supersamples.

@@ -56,6 +56,7 @@ from grimoire3d.presentation.shaders3d import (
     SKY_VERT, SKY_FRAG,
     BLIT_VERT, BLIT_FRAG,
 )
+from grimoire3d.presentation.bloom import BloomPass
 
 if TYPE_CHECKING:
     from grimoire3d.logic.camera3d import PerspectiveCamera
@@ -616,6 +617,9 @@ class _PostProcessPipeline:
         self._blit_prog["u_scene"].value = 0
         self._blit_vao = ctx.vertex_array(self._blit_prog, [])   # no VBO needed
 
+        # Bloom pass (half-res iterative Gaussian blur)
+        self._bloom_pass = BloomPass(ctx, settings)
+
         self._resize(width, height)
 
     # ------------------------------------------------------------------
@@ -630,13 +634,14 @@ class _PostProcessPipeline:
 
         self._w = width
         self._h = height
-        self._scene_color = self._ctx.texture((width, height), 4)
+        self._scene_color = self._ctx.texture((width, height), 4, dtype='f2')
         self._scene_color.filter = (moderngl.LINEAR, moderngl.LINEAR)
         self._scene_depth = self._ctx.depth_texture((width, height))
         self._scene_fbo   = self._ctx.framebuffer(
             color_attachments=[self._scene_color],
             depth_attachment=self._scene_depth,
         )
+        self._bloom_pass.ensure_size(width, height)
 
     def ensure_size(self, width: int, height: int) -> None:
         """Recreate the scene FBO if the render dimensions changed."""
@@ -675,6 +680,12 @@ class _PostProcessPipeline:
         self._ctx.screen.use()
         self._ctx.disable(moderngl.DEPTH_TEST)
         self._ctx.viewport = screen_viewport
+
+        # Bloom pass (before final gamma/brightness blit)
+        if s.bloom:
+            self._bloom_pass.execute(
+                self._scene_color, self._scene_fbo, self._w, self._h
+            )
 
         # Terminal pass: gamma correction + brightness → screen
         self._scene_color.use(0)

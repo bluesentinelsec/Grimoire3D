@@ -22,6 +22,14 @@ BLIT   — final post-processing blit from the intermediate scene FBO to the
          screen.  Applies gamma correction and brightness in a single pass.
          Additional post-processing passes (bloom, FXAA, …) are composited
          before or after this pass as separate programs.
+
+BLOOM_BRIGHT    — bright-pass extraction; discards pixels below a luminance
+                  threshold using a smooth knee function.
+
+BLOOM_BLUR      — separable 9-tap Gaussian blur pass (run horizontally then
+                  vertically on the bright-pass output).
+
+BLOOM_COMPOSITE — additive blend of the blurred bloom buffer onto the scene.
 """
 
 # ---------------------------------------------------------------------------
@@ -360,5 +368,118 @@ void main() {
     // Gamma correction: linearise display output
     color      = pow(color, vec3(1.0 / max(u_gamma, 0.01)));
     frag_color = vec4(color, 1.0);
+}
+"""
+
+# ===========================================================================
+# Bloom post-processing shaders
+# ===========================================================================
+# Three-pass bloom pipeline:
+#   1. BLOOM_BRIGHT_FRAG — extract bright pixels above a luminance threshold.
+#   2. BLOOM_BLUR_FRAG   — separable 9-tap Gaussian blur (run H then V).
+#   3. BLOOM_COMPOSITE_FRAG — additive blend of blurred bloom onto the scene.
+#
+# All three reuse BLIT_VERT (covering triangle via gl_VertexID).
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Bloom — bright-pass extraction
+# ---------------------------------------------------------------------------
+# Extracts pixels above a luminance threshold using a smooth quadratic knee
+# to avoid harsh cutoff artifacts.  Pixels below the soft threshold output
+# black; pixels above contribute proportionally.
+
+BLOOM_BRIGHT_FRAG = """
+#version 330 core
+
+in vec2 v_uv;
+
+uniform sampler2D u_scene;      // scene color (texture unit 0)
+uniform float     u_threshold;  // luminance cutoff
+
+out vec4 frag_color;
+
+void main() {
+    vec4 color = texture(u_scene, v_uv);
+
+    // Perceptual luminance (BT.709 coefficients)
+    float luminance = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+
+    // Smooth knee: ramp contribution from soft_threshold to threshold
+    float soft_threshold = u_threshold * 0.8;
+    float knee = clamp(
+        (luminance - soft_threshold) / (u_threshold - soft_threshold + 0.0001),
+        0.0, 1.0
+    );
+    float contribution = knee * knee;
+
+    frag_color = vec4(color.rgb * contribution, 1.0);
+}
+"""
+
+# ---------------------------------------------------------------------------
+# Bloom — separable 9-tap Gaussian blur
+# ---------------------------------------------------------------------------
+# Run this shader twice: once with u_direction = vec2(1.0/width, 0.0)
+# (horizontal), once with u_direction = vec2(0.0, 1.0/height) (vertical).
+# The weights are symmetric and sum to 1.0.
+
+BLOOM_BLUR_FRAG = """
+#version 330 core
+
+in vec2 v_uv;
+
+uniform sampler2D u_input;      // source texture (texture unit 0)
+uniform vec2      u_direction;  // blur direction in texel-space units
+
+out vec4 frag_color;
+
+void main() {
+    // Standard 9-tap Gaussian weights (symmetric, sum = 1.0)
+    const float weights[5] = float[5](
+        0.227027027,   // center (offset 0)
+        0.1945945946,  // ±1
+        0.1216216216,  // ±2
+        0.0540540541,  // ±3
+        0.0162162162   // ±4
+    );
+
+    // Center sample
+    vec3 result = texture(u_input, v_uv).rgb * weights[0];
+
+    // Symmetric taps at ±1 through ±4
+    for (int i = 1; i < 5; i++) {
+        vec2 offset = u_direction * float(i);
+        result += texture(u_input, v_uv + offset).rgb * weights[i];
+        result += texture(u_input, v_uv - offset).rgb * weights[i];
+    }
+
+    frag_color = vec4(result, 1.0);
+}
+"""
+
+# ---------------------------------------------------------------------------
+# Bloom — composite (additive blend onto scene)
+# ---------------------------------------------------------------------------
+# Additively blends the blurred bloom buffer onto the original scene.
+# u_intensity controls how strong the glow appears.
+
+BLOOM_COMPOSITE_FRAG = """
+#version 330 core
+
+in vec2 v_uv;
+
+uniform sampler2D u_scene;      // original scene color (texture unit 0)
+uniform sampler2D u_bloom;      // blurred bloom buffer (texture unit 1)
+uniform float     u_intensity;  // bloom strength multiplier
+
+out vec4 frag_color;
+
+void main() {
+    vec3 scene_color = texture(u_scene, v_uv).rgb;
+    vec3 bloom_color = texture(u_bloom, v_uv).rgb;
+
+    // Additive bloom composite
+    frag_color = vec4(scene_color + bloom_color * u_intensity, 1.0);
 }
 """
