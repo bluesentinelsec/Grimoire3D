@@ -30,6 +30,10 @@ BLOOM_BLUR      — separable 9-tap Gaussian blur pass (run horizontally then
                   vertically on the bright-pass output).
 
 BLOOM_COMPOSITE — additive blend of the blurred bloom buffer onto the scene.
+
+FXAA            — Fast Approximate Anti-Aliasing (quality preset 12).
+                  Single fullscreen post-process pass that detects and smooths
+                  high-contrast edges using luminance-based neighbor sampling.
 """
 
 # ---------------------------------------------------------------------------
@@ -480,5 +484,148 @@ void main() {
     // Output bloom contribution only; GL additive blending (ONE, ONE)
     // composites this onto the existing scene in the framebuffer.
     frag_color = vec4(bloom_color * u_intensity, 1.0);
+}
+"""
+
+# ---------------------------------------------------------------------------
+# FXAA — Fast Approximate Anti-Aliasing (quality preset 12)
+# ---------------------------------------------------------------------------
+# A single fullscreen post-process pass that detects and smooths high-contrast
+# edges using luminance-based neighbor sampling.  Based on Timothy Lottes'
+# FXAA 3.11 algorithm, simplified for GLSL 3.30 core.
+#
+# Uniforms:
+#   u_scene     — scene color texture (unit 0)
+#   u_texel_size — vec2(1.0/width, 1.0/height)
+
+FXAA_FRAG = """
+#version 330 core
+
+in vec2 v_uv;
+
+uniform sampler2D u_scene;
+uniform vec2      u_texel_size;
+
+out vec4 frag_color;
+
+// Perceptual luminance (BT.709)
+float luma(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+void main() {
+    vec3 rgbM  = texture(u_scene, v_uv).rgb;
+    float lumaM = luma(rgbM);
+
+    // Sample 4 direct neighbors
+    float lumaN = luma(texture(u_scene, v_uv + vec2( 0.0,  1.0) * u_texel_size).rgb);
+    float lumaS = luma(texture(u_scene, v_uv + vec2( 0.0, -1.0) * u_texel_size).rgb);
+    float lumaE = luma(texture(u_scene, v_uv + vec2( 1.0,  0.0) * u_texel_size).rgb);
+    float lumaW = luma(texture(u_scene, v_uv + vec2(-1.0,  0.0) * u_texel_size).rgb);
+
+    // Compute local contrast range
+    float lumaMin = min(lumaM, min(min(lumaN, lumaS), min(lumaE, lumaW)));
+    float lumaMax = max(lumaM, max(max(lumaN, lumaS), max(lumaE, lumaW)));
+    float lumaRange = lumaMax - lumaMin;
+
+    // Early exit: skip low-contrast areas (no aliasing visible)
+    if (lumaRange < max(0.0312, lumaMax * 0.125)) {
+        frag_color = vec4(rgbM, 1.0);
+        return;
+    }
+
+    // Sample 4 diagonal neighbors
+    float lumaNW = luma(texture(u_scene, v_uv + vec2(-1.0,  1.0) * u_texel_size).rgb);
+    float lumaNE = luma(texture(u_scene, v_uv + vec2( 1.0,  1.0) * u_texel_size).rgb);
+    float lumaSW = luma(texture(u_scene, v_uv + vec2(-1.0, -1.0) * u_texel_size).rgb);
+    float lumaSE = luma(texture(u_scene, v_uv + vec2( 1.0, -1.0) * u_texel_size).rgb);
+
+    // Compute sub-pixel aliasing blend factor
+    float lumaL = (lumaN + lumaS + lumaE + lumaW) * 0.25;
+    float rangeL = abs(lumaL - lumaM);
+    float blendL = max(0.0, (rangeL / lumaRange) - 0.25) * (1.0 / 0.75);
+    blendL = min(blendL, 0.75);
+
+    // Determine edge orientation (horizontal vs vertical)
+    float edgeH = abs(lumaNW + lumaNE - 2.0 * lumaN)
+                + abs(lumaW  + lumaE  - 2.0 * lumaM) * 2.0
+                + abs(lumaSW + lumaSE - 2.0 * lumaS);
+    float edgeV = abs(lumaNW + lumaSW - 2.0 * lumaW)
+                + abs(lumaN  + lumaS  - 2.0 * lumaM) * 2.0
+                + abs(lumaNE + lumaSE - 2.0 * lumaE);
+    bool isHorizontal = (edgeH >= edgeV);
+
+    // Choose edge step direction
+    float stepLength = isHorizontal ? u_texel_size.y : u_texel_size.x;
+    float gradientPos, gradientNeg;
+    if (isHorizontal) {
+        gradientPos = lumaN - lumaM;
+        gradientNeg = lumaS - lumaM;
+    } else {
+        gradientPos = lumaE - lumaM;
+        gradientNeg = lumaW - lumaM;
+    }
+
+    // Step in the direction of the steeper gradient
+    bool pairIsPos = abs(gradientPos) >= abs(gradientNeg);
+    float gradientScaled = 0.25 * max(abs(gradientPos), abs(gradientNeg));
+    if (!pairIsPos) stepLength = -stepLength;
+
+    // Compute edge walk starting UV
+    vec2 uvEdge = v_uv;
+    if (isHorizontal) {
+        uvEdge.y += stepLength * 0.5;
+    } else {
+        uvEdge.x += stepLength * 0.5;
+    }
+
+    // Walk along the edge in both directions to find endpoints
+    vec2 edgeStep = isHorizontal ? vec2(u_texel_size.x, 0.0) : vec2(0.0, u_texel_size.y);
+
+    vec2 uvPos = uvEdge + edgeStep;
+    vec2 uvNeg = uvEdge - edgeStep;
+    float lumaEndPos = luma(texture(u_scene, uvPos).rgb) - lumaM;
+    float lumaEndNeg = luma(texture(u_scene, uvNeg).rgb) - lumaM;
+    bool reachedPos = abs(lumaEndPos) >= gradientScaled;
+    bool reachedNeg = abs(lumaEndNeg) >= gradientScaled;
+
+    // Extend up to 12 steps in each direction
+    for (int i = 0; i < 11 && !(reachedPos && reachedNeg); i++) {
+        if (!reachedPos) {
+            uvPos += edgeStep;
+            lumaEndPos = luma(texture(u_scene, uvPos).rgb) - lumaM;
+            reachedPos = abs(lumaEndPos) >= gradientScaled;
+        }
+        if (!reachedNeg) {
+            uvNeg -= edgeStep;
+            lumaEndNeg = luma(texture(u_scene, uvNeg).rgb) - lumaM;
+            reachedNeg = abs(lumaEndNeg) >= gradientScaled;
+        }
+    }
+
+    // Compute edge blend based on distance to closest endpoint
+    float distPos = isHorizontal ? (uvPos.x - v_uv.x) : (uvPos.y - v_uv.y);
+    float distNeg = isHorizontal ? (v_uv.x - uvNeg.x) : (v_uv.y - uvNeg.y);
+    float distMin = min(distPos, distNeg);
+    float edgeLen = distPos + distNeg;
+    float edgeBlend = 0.5 - distMin / edgeLen;
+
+    // Only blend if the edge direction is consistent
+    bool directionCorrect = ((distPos < distNeg) ? (lumaEndPos < 0.0) : (lumaEndNeg < 0.0))
+                            != (lumaM - lumaL < 0.0);
+    if (!directionCorrect) edgeBlend = 0.0;
+
+    // Final blend factor: max of sub-pixel and edge-based
+    float finalBlend = max(edgeBlend, blendL);
+
+    // Blend along the edge normal
+    vec2 offset = vec2(0.0);
+    if (isHorizontal) {
+        offset.y = finalBlend * stepLength;
+    } else {
+        offset.x = finalBlend * stepLength;
+    }
+
+    frag_color = vec4(texture(u_scene, v_uv + offset).rgb, 1.0);
 }
 """
