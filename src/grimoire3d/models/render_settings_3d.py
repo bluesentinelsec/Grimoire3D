@@ -28,7 +28,8 @@ class RenderSettings3D:
     shadows: bool = False  # not yet implemented; flag reserved
 
     # Post-process (Phase 6)
-    fxaa: bool = False
+    # Anti-aliasing mode: "none", "fxaa", "msaa2x", "msaa4x"
+    aa_mode: str = "none"
     bloom: bool = False
     bloom_threshold: float = 1.0  # luminance cutoff for the bright-pass extraction
     bloom_intensity: float = 0.3  # strength of the additive bloom composite

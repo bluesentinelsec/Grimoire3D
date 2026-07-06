@@ -66,6 +66,7 @@ from grimoire3d.presentation.shaders3d import (
     BLIT_FRAG,
 )
 from grimoire3d.presentation.bloom import BloomPass
+from grimoire3d.presentation.fxaa import FxaaPass
 
 if TYPE_CHECKING:
     from grimoire3d.logic.camera3d import PerspectiveCamera
@@ -750,6 +751,9 @@ class _PostProcessPipeline:
         # Bloom pass (half-res iterative Gaussian blur)
         self._bloom_pass = BloomPass(ctx, settings)
 
+        # FXAA pass (full-res edge-aware smoothing)
+        self._fxaa_pass = FxaaPass(ctx, settings)
+
         self._resize(width, height)
 
     # ------------------------------------------------------------------
@@ -771,7 +775,44 @@ class _PostProcessPipeline:
             color_attachments=[self._scene_color],
             depth_attachment=self._scene_depth,
         )
+        # MSAA resources (multisampled renderbuffer + resolve)
+        self._rebuild_msaa(width, height)
         self._bloom_pass.ensure_size(width, height)
+        self._fxaa_pass.ensure_size(width, height)
+
+    def _rebuild_msaa(self, width: int, height: int) -> None:
+        """Create or release MSAA renderbuffers based on current aa_mode."""
+        # Release previous MSAA resources
+        if hasattr(self, '_msaa_fbo') and self._msaa_fbo is not None:
+            self._msaa_fbo.release()
+            self._msaa_color_rb.release()
+            self._msaa_depth_rb.release()
+        self._msaa_fbo = None
+        self._msaa_color_rb = None
+        self._msaa_depth_rb = None
+
+        mode = self._settings.aa_mode
+        if mode == "msaa2x":
+            samples = 2
+        elif mode == "msaa4x":
+            samples = 4
+        else:
+            return  # No MSAA needed
+
+        self._msaa_color_rb = self._ctx.renderbuffer(
+            (width, height), 4, samples=samples, dtype='f2'
+        )
+        self._msaa_depth_rb = self._ctx.depth_renderbuffer(
+            (width, height), samples=samples
+        )
+        self._msaa_fbo = self._ctx.framebuffer(
+            color_attachments=[self._msaa_color_rb],
+            depth_attachment=self._msaa_depth_rb,
+        )
+
+    def refresh_msaa(self) -> None:
+        """Rebuild MSAA resources if the aa_mode setting changed."""
+        self._rebuild_msaa(self._w, self._h)
 
     def ensure_size(self, width: int, height: int) -> None:
         """Recreate the scene FBO if the render dimensions changed."""
@@ -785,6 +826,8 @@ class _PostProcessPipeline:
     @property
     def scene_fbo(self) -> moderngl.Framebuffer:
         """Bind this before drawing the 3D scene."""
+        if self._msaa_fbo is not None:
+            return self._msaa_fbo
         return self._scene_fbo
 
     @property
@@ -811,12 +854,25 @@ class _PostProcessPipeline:
         self._ctx.disable(moderngl.DEPTH_TEST)
         self._ctx.viewport = screen_viewport
 
+        # MSAA resolve: blit multisampled FBO → single-sampled scene FBO
+        if self._msaa_fbo is not None:
+            self._ctx.copy_framebuffer(self._scene_fbo, self._msaa_fbo)
+
         # Bloom pass (before final gamma/brightness blit)
         if s.bloom:
             self._bloom_pass.execute(
                 self._scene_color, self._scene_fbo, self._w, self._h
             )
             # Bloom pass rebinds internal FBOs; restore screen target.
+            self._ctx.screen.use()
+            self._ctx.viewport = screen_viewport
+
+        # FXAA pass (after bloom, before final blit)
+        if s.aa_mode == "fxaa":
+            self._fxaa_pass.execute(
+                self._scene_color, self._scene_fbo, self._w, self._h
+            )
+            # FXAA rebinds FBOs; restore screen.
             self._ctx.screen.use()
             self._ctx.viewport = screen_viewport
 
